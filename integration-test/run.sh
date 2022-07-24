@@ -1,5 +1,6 @@
 #!/bin/bash -xe
 
+# Ensure datasets are downloaded
 # Create a KinD cluster with the repo checkout mounted
 # Deploy an NGinx server with Helm that mounts the current directory at the serving root
 # Deploy a MongoDB server with Helm
@@ -11,6 +12,12 @@
     # If in dev mode, restart grafana to ensure any changes take effect, then start port forwarding
     # If not in dev mode, wait for grafana to become health in a reasonable amount of time, then run a Job
     #     that hits the datasource
+
+if ! [ -f integration-test/datasets/download/tweets.zip ]; then
+    curl -vfL https://github.com/ozlerhakan/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true > integration-test/datasets/download/tweets.zip
+fi
+rm -rf integration-test/datasets/download/tweets
+unzip integration-test/datasets/download/tweets.zip -d integration-test/datasets/download/tweets/
 
 export KUBECONFIG=${KUBECONFIG:-integration-test/kubeconfig}
 KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-meln5674-mongodb-community-it}
@@ -30,7 +37,9 @@ metadata:
   name: mongodb-init
 data:
   weather.js: |
-$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/weather.js; set +x)
+$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/weather.js; set +x)
+  tweets.sh: |
+$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/tweets.sh; set +x)
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -67,6 +76,10 @@ MONGODB_ARGS=(
     --set auth.rootPassword=root
     --set initdbScriptsConfigMap=mongodb-init
     --set useStatefulSet=true
+    --set extraVolumes[0].name=sample-data
+    --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
+    --set extraVolumeMounts[0].name=sample-data
+    --set extraVolumeMounts[0].mountPath=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
 )
 
 helm upgrade --install mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
@@ -123,18 +136,22 @@ spec:
         args:
         - |
             curl -v -f -u admin:admin http://grafana:3000/api/datasources/1/health
-            curl 'http://grafana:3000/api/ds/query' \
-              -v -f \
-              -u admin:admin \
-              -H 'accept: application/json, text/plain, */*' \
-              -H 'content-type: application/json' \
-              --data-raw '$(cat integration-test/queries/weather/timeseries.json)'
-            curl 'http://grafana:3000/api/ds/query' \
-              -v -f \
-              -u admin:admin \
-              -H 'accept: application/json, text/plain, */*' \
-              -H 'content-type: application/json' \
-              --data-raw '$(cat integration-test/queries/weather/table.json)'
+            for query in weather/timeseries weather/table tweets/timeseries; do
+                curl 'http://grafana:3000/api/ds/query' \
+                  -v -f \
+                  -u admin:admin \
+                  -H 'accept: application/json, text/plain, */*' \
+                  -H 'content-type: application/json' \
+                  --data-raw "\$(cat /mnt/host/grafana-mongodb-community-plugin/integration-test//queries/\${query}.json)"
+            done
+        volumeMounts:
+        - name: datasets
+          mountPath: /mnt/host/grafana-mongodb-community-plugin/integration-test/
+      volumes:
+      - name: datasets
+        hostPath:
+          path: /mnt/host/grafana-mongodb-community-plugin/integration-test/
+         
 EOF
 
 
