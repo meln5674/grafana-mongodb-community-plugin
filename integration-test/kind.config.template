@@ -1,0 +1,8 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: meln5674-mongodb-community-it
+nodes:
+- role: control-plane
+  extraMounts:
+  - hostPath: 
+    containerPath: /mnt/host/grafana-mongodb-community-plugin

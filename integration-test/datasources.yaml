@@ -1,0 +1,11 @@
+apiVersion: 1
+datasources:
+- name: mongodb
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb:27017
+  secureJsonData:
+    username: root
+    password: root
+

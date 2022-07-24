@@ -1,0 +1,31 @@
+{
+  "name": "meln-5674-mongodb-community",
+  "version": "1.0.0",
+  "description": "Community-supported MongoDB Datasource Plugin",
+  "scripts": {
+    "build": "grafana-toolkit plugin:build",
+    "test": "grafana-toolkit plugin:test",
+    "dev": "grafana-toolkit plugin:dev",
+    "watch": "grafana-toolkit plugin:dev --watch",
+    "sign": "grafana-toolkit plugin:sign",
+    "start": "yarn watch"
+  },
+  "author": "Andrew Melnick",
+  "license": "AGPL-3.0",
+  "dependencies": {
+      "mongodb": "^4.8.0"
+  },
+  "devDependencies": {
+    "@grafana/data": "latest",
+    "@grafana/toolkit": "latest",
+    "@grafana/runtime": "latest",
+    "@grafana/ui": "latest",
+    "@types/lodash": "latest"
+  },
+  "resolutions": {
+    "rxjs": "7.3.0"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "mongodb-community",
+  "id": "meln5674-mongodb-community",
+  "metrics": true,
+  "backend": true,
+  "executable": "gpx_mongodb-community",
+  "info": {
+    "description": "Community-supported MongoDB Datasource Plugin",
+    "author": {
+      "name": "Andrew Melnick",
+      "url": "https://github.com/meln5674"
+    },
+    "keywords": [
+      "mongodb",
+      "nosql"
+    ],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "Website",
+        "url": "https://github.com/meln5674/grafana-mongodb-community-plugin"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/meln5674/grafana/mongodb-community-plugin/blob/master/LICENSE"
+      }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=7.0.0",
+    "plugins": []
+  }
+}
