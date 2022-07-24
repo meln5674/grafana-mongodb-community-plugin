@@ -131,19 +131,19 @@ spec:
               -H 'content-type: application/json' \
               --data-raw '$(cat integration-test/query.json)'
 EOF
-fi
 
 
-kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
-kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
+    kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
+    kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
 
-wait -n
+    wait -n
 
-kill $(jobs -p)
+    kill $(jobs -p)
 
-if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
-    kubectl logs job/grafana-mongodb-community-plugin-it
+    if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
+        kubectl logs job/grafana-mongodb-community-plugin-it
 
-    echo
-    exit 1
+        echo
+        exit 1
+    fi
 fi
