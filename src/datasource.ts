@@ -1,4 +1,5 @@
-import { DataSourceInstanceSettings, ScopedVars } from '@grafana/data';
+import { Observable } from 'rxjs';
+import { DataSourceInstanceSettings, ScopedVars, DataQueryRequest, DataQueryResponse } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { MongoDBDataSourceOptions, MongoDBQuery } from './types';
 
@@ -9,10 +10,15 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
 
  applyTemplateVariables(query: MongoDBQuery, scopedVars: ScopedVars): Record<string, any> {
     const templateSrv = getTemplateSrv();
-    const newAggregation = query.aggregation ? templateSrv.replace(query.aggregation, scopedVars) : ''
     return {
       ...query,
-      aggregation: newAggregation
+      aggregation: query.aggregation ? templateSrv.replace(query.aggregation, scopedVars) : ''
     };
+  }
+
+  query(request: DataQueryRequest<MongoDBQuery>): Observable<DataQueryResponse> {
+      const templateSrv = getTemplateSrv();
+      templateSrv.updateTimeRange(request.range);
+      return super.query(request);
   }
 }
