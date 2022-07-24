@@ -12,7 +12,7 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
     const templateSrv = getTemplateSrv();
     return {
       ...query,
-      aggregation: query.aggregation ? templateSrv.replace(query.aggregation, scopedVars) : ''
+      aggregation: query.aggregation ? templateSrv.replace(query.aggregation, scopedVars, 'json') : ''
     };
   }
 
