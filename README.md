@@ -2,7 +2,7 @@
 
 This Open Source Grafana plugin allows for querying a MongoDB database or cluster.
 
-# This plugins is still in early development, and experimental. Everything is subject to change. Use at your own risk. Help Wanted.
+# This plugin is still in early development, and experimental. Everything is subject to change. Use at your own risk. Help Wanted.
 
 ## Building
 
@@ -56,7 +56,7 @@ GF_INSTALL_PLUGINS=meln5674-mongodb-community=<your repository url>/meln5674-mon
 
 Consult your grafana distribution documentation (e.g. https://github.com/bitnami/charts/tree/master/bitnami/grafana) for how to specify plugins to install
 
-## Development
+### Development
 
 Copy built repository to `<grafana plugins dir>/meln5674-mongodb-community`
 
@@ -113,3 +113,4 @@ Do you know about any of the following topics? If so, I'd love to hear from you!
 * MongoDB - Providing representative sample data sets and queries to improve automated tests. Implementing other authentication types.
 * Grafana - Sample dashboards using the sample datasets
 * All three - Investigating implementing a graphical query builder.
+* Github - Implementing automated releases
