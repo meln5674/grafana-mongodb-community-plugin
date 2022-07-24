@@ -2,6 +2,8 @@
 
 This Open Source Grafana plugin allows for querying a MongoDB database or cluster.
 
+# This plugins is still in early development, and experimental. Everything is subject to change. Use at your own risk. Help Wanted.
+
 ## Building
 
 Tools Needed:
@@ -15,7 +17,7 @@ If you have Docker installed you can use `./build-env.sh` to build and run a she
 ```bash
 yarn install
 yarn build
-mage -v
+yarn backend
 ```
 
 ## Installation
@@ -67,7 +69,7 @@ Tools Needed:
 * Kubectl
 
 ```bash
-integration-test/run.sh
+yarn integration-test
 ```
 
 ## Live Development Environment
@@ -76,12 +78,12 @@ integration-test/run.sh
 export KUBECONFIG=integration-test/kubeconfig
 export INTEGRATION_TEST_NO_CLEANUP=1
 export INTEGRATION_TEST_DEV_MODE=1
-integration-test/run.sh
+yarn integration-test
 ```
 
 Grafana credentials: admin/admin
 MongoDD credentials: root/root
-MongoDB Test dataset: test.weather { "metadata": { "sensorId": int, "type": string }, "timestamp": ISODate(...), "value": float }
+MongoDB Test dataset: test.weather { "metadata": { "sensorId": int, "type": string }, "timestamp": ISODate(...), "value": int }
 
 Cleanup:
 
@@ -90,3 +92,12 @@ export INTEGRATION_TEST_NO_CLEANUP=
 export INTEGRATION_TEST_DEV_MODE=
 integration-test/run.sh
 ```
+
+## Help Wanted
+
+Do you know about any of the following topics? If so, I'd love to hear from you!
+
+* React.js - Making the query editor UI not an eyesore
+* MongodB - Providing representative sample data sets and queries to improve automated tests
+
+
