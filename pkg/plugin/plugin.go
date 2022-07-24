@@ -199,6 +199,35 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	return mongoClient, "", nil, nil
 }
 
+func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc timestepDocument, fieldTypes []data.FieldType) (err error) {
+	defer func() {
+		if panic_ := recover(); panic_ != nil {
+			switch panic_.(type) {
+			case error:
+				err = panic_.(error)
+			default:
+				err = fmt.Errorf("%v", panic_)
+			}
+		}
+	}()
+	labels := m.getLabels(doc)
+	labelsID := fmt.Sprintf("%#v", labels)
+	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
+	frame, ok := frames[labelsID]
+	if !ok {
+		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
+		frame = data.NewFrameOfFieldTypes(labelsID, 0, fieldTypes...)
+		frames[labelsID] = frame
+	}
+	row, err := m.getValues(doc)
+	if err != nil {
+		return err
+	}
+	frame.AppendRow(row...)
+
+	return nil
+}
+
 func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
 	log.DefaultLogger.Info("query called", "context", pCtx, "query", query)
 	response := backend.DataResponse{}
@@ -230,20 +259,6 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	/*
-		// Make a modified version of the requested aggregation pipeline which counts the number of documents
-		// by each unique combination of the label fields
-		countPipelineTail, err := qm.getCountPipelineTail()
-		if err != nil {
-			response.Error = err
-			return response
-		}
-
-		countPipeline := make(mongo.Pipeline, 0, len(pipeline)+len(countPipelineTail))
-		countPipeline = append(countPipeline, pipeline...)
-		countPipeline = append(countPipeline, countPipelineTail...)
-	*/
-
 	mongoClient, _, err, internalErr := connect(ctx, pCtx)
 	if internalErr != nil {
 		response.Error = internalErr
@@ -265,7 +280,6 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		response.Error = err
 		return response
 	}
-
 	for cursor.Next(ctx) {
 		doc := timestepDocument{}
 		err = cursor.Decode(&doc)
@@ -273,22 +287,11 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 			response.Error = err
 			return response
 		}
-		labels := qm.getLabels(doc)
-		labelsID := fmt.Sprintf("%#v", labels)
-		// TODO: Might not work, need to find a fast but stable way to identify a set of labels
-		frame, ok := frames[labelsID]
-		if !ok {
-			log.DefaultLogger.Debug("Creating frame for unique label combination", "context", pCtx, "query", query, "doc", doc, "labels", labels, "labelsID", labelsID)
-			frame = data.NewFrameOfFieldTypes(labelsID, 0, fieldTypes...)
-			frames[labelsID] = frame
-		}
-		row, err := qm.getValues(doc)
+		err = qm.parseQueryResultDocument(frames, doc, fieldTypes)
 		if err != nil {
-			response.Error = fmt.Errorf("Bad documment: %s, %v", err, doc)
+			response.Error = fmt.Errorf("Bad document: %s, %v", err, doc)
 			return response
 		}
-		log.DefaultLogger.Debug("Got row", "row", row, "doc", doc)
-		frame.AppendRow(row...)
 	}
 	if cursor.Err() != nil {
 		response.Error = cursor.Err()
