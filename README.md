@@ -29,7 +29,7 @@ See `integration-tests` directory for configuration examples.
 Run
 
 ```bash
-yarn make-plugin
+yarn plugin
 ```
 
 Then copy the produced `meln5674-mongodb-community.zip` file to your artifact repository (e.g. Nexus) or web server (.e.g Nginx) of choice.
