@@ -7,8 +7,12 @@
 #   If in dev mode, mount the current directory at the correct plugin location
 #   If not in dev mode, set the plugins env var to download the plugin zip from NGinx
 
+# Once grafana is installed
+    # If in dev mode, restart grafana to ensure any changes take effect, then start port forwarding
+    # If not in dev mode, wait for grafana to become health in a reasonable amount of time, then run a Job
+    #     that hits the datasource
 
-export KUBECONFIG=integration-test/kubeconfig
+export KUBECONFIG=${KUBECONFIG:-integration-test/kubeconfig}
 KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-meln5674-mongodb-community-it}
 if ! kind get clusters | grep -q "${KIND_CLUSTER_NAME}" ; then
     sed "s/hostPath: .*/hostPath: '${PWD//\//\\/}'/" < integration-test/kind.config.template > integration-test/kind.config
@@ -72,7 +76,7 @@ GRAFANA_ARGS=(
     --set admin.password=admin
     --set config.grafanaIniConfigMap=grafana-ini
     --set config.useGrafanaIniFile=true
-    --set image.tag=7.1.5-debian-10-r9
+    # --set image.tag=7.1.5-debian-10-r9
 )
 
 if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
@@ -100,31 +104,46 @@ if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
     echo 'Forwarding ports. Press Ctrl+C to exit and re-run this script to make changes'
     kubectl port-forward deploy/grafana 3000:3000
 else
-    kubectl apply -f - <<EOF
+    kubectl wait deploy/grafana --for=condition=available --timeout=120s
+    kubectl replace --force -f - <<EOF
 
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: grafana-mongodb-community-plugin-it
 spec:
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
-      backoffLimit: 0
-      container:
+      containers:
       - name: curl
         image: docker.io/alpine/curl:latest
-        command: [bash, -exuc]
+        command: [sh, -exuc]
         args:
         - |
             curl -v -f -u admin:admin http://grafana:3000/api/datasources/1/health
+            # [{ "$project": { "timestamp": 1, "sensorID": "$metadata.sensorId", "temperature": "$temp", "foo": { "$literal": ${__from} } }}]
             curl 'http://grafana:3000/api/ds/query' \
-              -u admin:admin
+              -v -f \
+              -u admin:admin \
               -H 'accept: application/json, text/plain, */*' \
               -H 'content-type: application/json' \
-              --data-raw '{"queries":[{"refId":"A","key":"Q-1658610050165-0.1984190376564421-0","database":"test","collection":"weather","timestampField":"timestamp","labelFields":["sensorID"],"valueFields":["temperature"],"valueFieldTypes":["float64"],"aggregation":"[{ \"$project\": { \"sensorID\": \"$metadata.sensorId\", \"temperature\": \"$temp\" }}]","maxDataPoints":960,"liveStreaming":false,"showingGraph":true,"showingTable":true,"datasourceId":1,"intervalMs":5000,"orgId":1}],"range":{"from":"2022-07-23T20:00:50.165Z","to":"2022-07-23T21:00:50.165Z","raw":{"from":"now-1h","to":"now"}},"from":"1658606450165","to":"1658610050165"}'
-
+              --data-raw '$(cat integration-test/query.json)'
 EOF
 fi
 
-# [{ "$project": { "timestamp": 1, "sensorID": "$metadata.sensorId", "temperature": "$temp" }}]
+
+kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
+kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
+
+wait -n
+
+kill $(jobs -p)
+
+if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
+    kubectl logs job/grafana-mongodb-community-plugin-it
+
+    echo
+    exit 1
+fi
