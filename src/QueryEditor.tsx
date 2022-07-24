@@ -1,12 +1,12 @@
 import { defaults } from 'lodash';
 
-import React, { ChangeEvent, PureComponent/*, SyntheticEvent*/ } from 'react';
+import React, { ChangeEvent, PureComponent, SyntheticEvent } from 'react';
 import { LegacyForms } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 import { DataSource } from './datasource';
 import { defaultQuery, MongoDBDataSourceOptions, MongoDBQuery } from './types';
+const { FormField, Switch } = LegacyForms;
 
-const { FormField /*, Switch*/ } = LegacyForms;
 
 type Props = QueryEditorProps<DataSource, MongoDBQuery, MongoDBDataSourceOptions>;
 
@@ -22,6 +22,15 @@ export class QueryEditor extends PureComponent<Props> {
     // executes the query
     onRunQuery();
   };
+
+  onTimestampFieldChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, timestampField: event.target.value });
+    // executes the query
+    onRunQuery();
+  };
+
+
   onLabelFieldsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     onChange({ ...query, labelFields: event.target.value.split(",") });
@@ -52,9 +61,15 @@ export class QueryEditor extends PureComponent<Props> {
   };
 
 
-  onTimestampFieldChange = (event: ChangeEvent<HTMLInputElement>) => {
+  onAutoTimeBoundChange = (event: SyntheticEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
-    onChange({ ...query, timestampField: event.target.value });
+    onChange({ ...query, autoTimeBound: event.currentTarget.checked });
+    // executes the query
+    onRunQuery();
+  };
+  onAutoTimeSortChange = (event: SyntheticEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, autoTimeSort: event.currentTarget.checked });
     // executes the query
     onRunQuery();
   };
@@ -62,14 +77,13 @@ export class QueryEditor extends PureComponent<Props> {
 
   render() {
     const query = defaults(this.props.query, defaultQuery);
-    const { database, collection, timestampField, labelFields, valueFields, valueFieldTypes, aggregation} = query;
 
     return (
       <div className="gf-form-group">
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={database || ''}
+          value={query.database || ''}
           onChange={this.onDatabaseChange}
           label="Database"
         />
@@ -78,7 +92,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={collection || ''}
+          value={query.collection || ''}
           onChange={this.onCollectionChange}
           label="Collection"
         />
@@ -87,7 +101,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={timestampField || ''}
+          value={query.timestampField || ''}
           onChange={this.onTimestampFieldChange}
           label="Timestamp Field"
           tooltip="Field to expect in every document containing a unix millis timestamp or ISO timestamp"
@@ -96,7 +110,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={(labelFields || []).join(",")}
+          value={(query.labelFields || []).join(",")}
           onChange={this.onLabelFieldsChange}
           label="Label Fields"
           tooltip="Comma separated list of fields containg labels to distinguish different series. Nested fields are not supported, please project to a flat document"
@@ -106,7 +120,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={(valueFields || []).join(",")}
+          value={(query.valueFields || []).join(",")}
           onChange={this.onValueFieldsChange}
           label="Value Fields"
           tooltip="Comma separated list of fields containing measurements or other recorded values. Nested fields are not supported, please project to a flat document"
@@ -116,7 +130,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={(valueFieldTypes || []).join(",")}
+          value={(query.valueFieldTypes || []).join(",")}
           onChange={this.onValueFieldTypesChange}
           label="Value Field Types"
           tooltip="Comma separated list of the data types (float64, uint64, string, etc) of the values listed in the Value Fields. Prefix with a star if a field may not appear in every document for a given series."
@@ -126,12 +140,28 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <FormField
           labelWidth={8}
-          value={aggregation || ''}
+          value={query.aggregation || ''}
           onChange={this.onAggregationChange}
           label="Aggregation"
           tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects"
         />
       </div>
+
+      <div className="gf-form">
+        <Switch
+          checked={query.autoTimeBound|| false}
+          onChange={this.onAutoTimeBoundChange}
+          label="Automatic Time-Bound"
+        />
+      </div>
+      <div className="gf-form">
+        <Switch
+          checked={query.autoTimeSort|| false}
+          onChange={this.onAutoTimeSortChange}
+          label="Automatic Time-Sort"
+        />
+      </div>
+
       </div>
     );
   }

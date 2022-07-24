@@ -79,6 +79,8 @@ type queryModel struct {
 	LabelFields     []string `json:"labelFields"`
 	ValueFields     []string `json:"valueFields"`
 	ValueFieldTypes []string `json:"valueFieldTypes"`
+	AutoTimeBound   bool     `json:"autoTimeBound"`
+	AutoTimeSort    bool     `json:"autoTimeSort"`
 
 	Aggregation string `json:"aggregation"`
 }
@@ -103,9 +105,35 @@ func (m *queryModel) getFieldTypes() ([]data.FieldType, error) {
 	return types, nil
 }
 
-func (m *queryModel) getPipeline() (mongo.Pipeline, error) {
+func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, error) {
 	pipeline := mongo.Pipeline{}
-	err := bson.UnmarshalExtJSON([]byte(m.Aggregation), true, &pipeline)
+	if m.AutoTimeBound {
+		pipeline = append(pipeline, bson.D{bson.E{
+			Key: "$match",
+			Value: bson.D{bson.E{
+				Key: m.TimestampField,
+				Value: bson.D{
+					bson.E{Key: "$gte", Value: bsonPrim.NewDateTimeFromTime(from)},
+					bson.E{Key: "$lte", Value: bsonPrim.NewDateTimeFromTime(to)},
+				},
+			}},
+		}})
+	}
+
+	userPipeline := mongo.Pipeline{}
+	err := bson.UnmarshalExtJSON([]byte(m.Aggregation), true, &userPipeline)
+	if err != nil {
+		return mongo.Pipeline{}, err
+	}
+	pipeline = append(pipeline, userPipeline...)
+	if m.AutoTimeSort {
+		pipeline = append(pipeline, bson.D{
+			bson.E{
+				Key:   "$sort",
+				Value: bson.D{bson.E{Key: m.TimestampField, Value: 1}},
+			},
+		})
+	}
 	return pipeline, err
 }
 
@@ -253,7 +281,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	pipeline, err := qm.getPipeline()
+	pipeline, err := qm.getPipeline(query.TimeRange.From, query.TimeRange.To)
 	if err != nil {
 		response.Error = err
 		return response

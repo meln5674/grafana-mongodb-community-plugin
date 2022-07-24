@@ -8,6 +8,8 @@ export interface MongoDBQuery extends DataQuery {
   valueFields: string[];
   valueFieldTypes: string[];
   aggregation: string;
+  autoTimeBound: boolean;
+  autoTimeSort: boolean;
 }
 
 export const defaultQuery: Partial<MongoDBQuery> = {
@@ -26,7 +28,9 @@ export const defaultQuery: Partial<MongoDBQuery> = {
                 "_id": 0 
             }
         }
-    ])
+    ]),
+    autoTimeBound: false,
+    autoTimeSort: false
 };
 
 /**
