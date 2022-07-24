@@ -2,16 +2,31 @@ import { defaults } from 'lodash';
 
 import React, { ChangeEvent, PureComponent, SyntheticEvent } from 'react';
 import { LegacyForms, Tooltip, InlineFormLabel, Icon } from '@grafana/ui';
-import { QueryEditorProps } from '@grafana/data';
+import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from './datasource';
-import { defaultQuery, MongoDBDataSourceOptions, MongoDBQuery } from './types';
-const { FormField, Input, Switch } = LegacyForms;
+import { defaultQuery, MongoDBDataSourceOptions, MongoDBQuery, MongoDBQueryType } from './types';
+const { FormField, Input, Switch, Select } = LegacyForms;
 
 
 type Props = QueryEditorProps<DataSource, MongoDBQuery, MongoDBDataSourceOptions>;
 
 export class QueryEditor extends PureComponent<Props> {
-  labelWidth = 12;
+  readonly labelWidth = 12;
+
+  readonly queryTypeOptions = [
+    {
+        label: "Timeseries",
+        value: MongoDBQueryType.Timeseries,
+        description: "Return time-indexed series of values, distinguished by a set of labels"
+    },
+    {
+        label: "Table",
+        value: MongoDBQueryType.Table,
+        description: "Return arbitrary rows for a table or further processing"
+    }
+  ];
+
+  readonly defaultQueryType: MongoDBQueryType = MongoDBQueryType.Timeseries;
 
   onDatabaseChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query } = this.props;
@@ -22,6 +37,14 @@ export class QueryEditor extends PureComponent<Props> {
     const { onChange, query, onRunQuery } = this.props;
     onChange({ ...query, collection: event.target.value });
     // executes the query
+    onRunQuery();
+  };
+  onQueryTypeChange = (
+        query: Props['query'],
+        onChange: Props['onChange'],
+        onRunQuery: Props['onRunQuery'],
+  ) => (newValue: SelectableValue) => {
+    onChange({ ...query, queryType: newValue.value });
     onRunQuery();
   };
 
@@ -79,9 +102,10 @@ export class QueryEditor extends PureComponent<Props> {
 
   render() {
     const query = defaults(this.props.query, defaultQuery);
+    const { onChange, onRunQuery } = this.props;
 
     return (
-      <div className="gf-form-group">
+    <div className="gf-form-group">
       <div className="gf-form">
         <FormField
           labelWidth={this.labelWidth}
@@ -98,26 +122,42 @@ export class QueryEditor extends PureComponent<Props> {
           onChange={this.onCollectionChange}
           label="Collection"
         />
+      </div>
+      <div className="gf-form">
+        <InlineFormLabel
+                width={this.labelWidth}
+                tooltip="Type of query to execute">
+        QueryType
+        </InlineFormLabel>
+        <Select
+            options={this.queryTypeOptions}
+            value={this.queryTypeOptions.find((queryType) => queryType.value === query.queryType) ?? this.queryTypeOptions[0]}
+            onChange={this.onQueryTypeChange(query, onChange, onRunQuery)}
+        />
+      </div>
 
-      </div>
-      <div className="gf-form">
-        <FormField
-          labelWidth={this.labelWidth}
-          value={query.timestampField || ''}
-          onChange={this.onTimestampFieldChange}
-          label="Timestamp Field"
-          tooltip="Field to expect in every document containing a unix millis timestamp or ISO timestamp"
-        />
-      </div>
-      <div className="gf-form">
-        <FormField
-          labelWidth={this.labelWidth}
-          value={(query.labelFields || []).join(",")}
-          onChange={this.onLabelFieldsChange}
-          label="Label Fields"
-          tooltip="Comma separated list of fields containg labels to distinguish different series. Nested fields are not supported, please project to a flat document"
-        />
-      </div>
+      { (query.queryType || this.defaultQueryType) === MongoDBQueryType.Timeseries ? (
+        <div>
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={query.timestampField || ''}
+              onChange={this.onTimestampFieldChange}
+              label="Timestamp Field"
+              tooltip="Field to expect in every document containing a unix millis timestamp or ISO timestamp"
+            />
+          </div>
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={(query.labelFields || []).join(",")}
+              onChange={this.onLabelFieldsChange}
+              label="Label Fields"
+              tooltip="Comma separated list of fields containg labels to distinguish different series. Nested fields are not supported, please project to a flat document"
+            />
+          </div>
+        </div>
+      ) : false }
 
       <div className="gf-form">
         <FormField
@@ -142,7 +182,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form">
         <InlineFormLabel
                 width={this.labelWidth}
-                tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects"
+                tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects. Helper functions like new Date() or ObjectId() are not supported"
         >
         Aggregation
         </InlineFormLabel>
@@ -152,39 +192,41 @@ export class QueryEditor extends PureComponent<Props> {
           label="Aggregation"
         />
       </div>
-
-      <div className="gf-form">
-        <Switch
-          checked={query.autoTimeBound|| false}
-          onChange={this.onAutoTimeBoundChange}
-          label="Automatic Time-Bound"
-        />
-        <Tooltip
-                placement="top"
-                content="Add a stage at the beginning to $match documents where Timestamp Field is within the current dashboard time range"
-                theme={'info'}>
-          <div className="gf-form-help-icon gf-form-help-icon--right-normal">
-            <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+      { (query.queryType || this.defaultQueryType) === MongoDBQueryType.Timeseries ? (
+        <div>
+          <div className="gf-form">
+            <Switch
+              checked={query.autoTimeBound|| false}
+              onChange={this.onAutoTimeBoundChange}
+              label="Automatic Time-Bound"
+            />
+            <Tooltip
+                    placement="top"
+                    content="Add a stage at the beginning to $match documents where Timestamp Field is within the current dashboard time range"
+                    theme={'info'}>
+              <div className="gf-form-help-icon gf-form-help-icon--right-normal">
+                <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+              </div>
+            </Tooltip>
           </div>
-        </Tooltip>
-      </div>
-      <div className="gf-form">
-        <Switch
-          checked={query.autoTimeSort|| false}
-          onChange={this.onAutoTimeSortChange}
-          label="Automatic Time-Sort"
-        />
-        <Tooltip
-                placement="top"
-                content="Add a stage at the end to $sort documents ascending by Timestamp Field"
-                theme={'info'}>
-          <div className="gf-form-help-icon gf-form-help-icon--right-normal">
-            <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+          <div className="gf-form">
+            <Switch
+              checked={query.autoTimeSort|| false}
+              onChange={this.onAutoTimeSortChange}
+              label="Automatic Time-Sort"
+            />
+            <Tooltip
+                    placement="top"
+                    content="Add a stage at the end to $sort documents ascending by Timestamp Field"
+                    theme={'info'}>
+              <div className="gf-form-help-icon gf-form-help-icon--right-normal">
+                <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+              </div>
+            </Tooltip>
           </div>
-        </Tooltip>
       </div>
-
-      </div>
+      ) : false }
+    </div>
     );
   }
 }

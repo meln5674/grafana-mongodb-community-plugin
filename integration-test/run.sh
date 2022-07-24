@@ -123,13 +123,18 @@ spec:
         args:
         - |
             curl -v -f -u admin:admin http://grafana:3000/api/datasources/1/health
-            # [{ "$project": { "timestamp": 1, "sensorID": "$metadata.sensorId", "temperature": "$temp", "foo": { "$literal": ${__from} } }}]
             curl 'http://grafana:3000/api/ds/query' \
               -v -f \
               -u admin:admin \
               -H 'accept: application/json, text/plain, */*' \
               -H 'content-type: application/json' \
-              --data-raw '$(cat integration-test/query.json)'
+              --data-raw '$(cat integration-test/queries/weather/timeseries.json)'
+            curl 'http://grafana:3000/api/ds/query' \
+              -v -f \
+              -u admin:admin \
+              -H 'accept: application/json, text/plain, */*' \
+              -H 'content-type: application/json' \
+              --data-raw '$(cat integration-test/queries/weather/table.json)'
 EOF
 
 

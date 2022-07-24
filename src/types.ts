@@ -12,9 +12,15 @@ export interface MongoDBQuery extends DataQuery {
   autoTimeSort: boolean;
 }
 
+export enum MongoDBQueryType {
+    Timeseries = "Timeseries",
+    Table = "Table",
+};
+
 export const defaultQuery: Partial<MongoDBQuery> = {
     database: "my_db",
     collection: "my_collection",
+    queryType: MongoDBQueryType.Timeseries,
     timestampField: "timestamp",
     labelFields: [ "sensorID" ],
     valueFields: [ "measurement" ],

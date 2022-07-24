@@ -72,17 +72,24 @@ func (d *MongoDBDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	return response, nil
 }
 
-type queryModel struct {
-	Database        string   `json:"database"`
-	Collection      string   `json:"collection"`
-	TimestampField  string   `json:"timestampField"`
-	LabelFields     []string `json:"labelFields"`
-	ValueFields     []string `json:"valueFields"`
-	ValueFieldTypes []string `json:"valueFieldTypes"`
-	AutoTimeBound   bool     `json:"autoTimeBound"`
-	AutoTimeSort    bool     `json:"autoTimeSort"`
+type queryType = string
 
-	Aggregation string `json:"aggregation"`
+const (
+	queryTypeTimeseries = "Timeseries"
+	queryTypeTable      = "Table"
+)
+
+type queryModel struct {
+	Database        string    `json:"database"`
+	Collection      string    `json:"collection"`
+	QueryType       queryType `json:"queryType"`
+	TimestampField  string    `json:"timestampField"`
+	LabelFields     []string  `json:"labelFields"`
+	ValueFields     []string  `json:"valueFields"`
+	ValueFieldTypes []string  `json:"valueFieldTypes"`
+	AutoTimeBound   bool      `json:"autoTimeBound"`
+	AutoTimeSort    bool      `json:"autoTimeSort"`
+	Aggregation     string    `json:"aggregation"`
 }
 
 type frameCountDocument struct {
@@ -92,9 +99,19 @@ type frameCountDocument struct {
 
 type timestepDocument = map[string]interface{}
 
+func (m *queryModel) numValues() int {
+	if m.QueryType == queryTypeTimeseries {
+		return len(m.ValueFields) + 1
+	} else {
+		return len(m.ValueFields)
+	}
+}
+
 func (m *queryModel) getFieldTypes() ([]data.FieldType, error) {
-	types := make([]data.FieldType, 0, len(m.ValueFieldTypes)+1)
-	types = append(types, data.FieldTypeTime)
+	types := make([]data.FieldType, 0, m.numValues())
+	if m.QueryType == queryTypeTimeseries {
+		types = append(types, data.FieldTypeTime)
+	}
 	for _, typeStr := range m.ValueFieldTypes {
 		type_, ok := data.FieldTypeFromItemTypeString(typeStr)
 		if !ok {
@@ -104,10 +121,9 @@ func (m *queryModel) getFieldTypes() ([]data.FieldType, error) {
 	}
 	return types, nil
 }
-
 func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, error) {
 	pipeline := mongo.Pipeline{}
-	if m.AutoTimeBound {
+	if m.QueryType == queryTypeTimeseries && m.AutoTimeBound {
 		pipeline = append(pipeline, bson.D{bson.E{
 			Key: "$match",
 			Value: bson.D{bson.E{
@@ -126,7 +142,7 @@ func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, 
 		return mongo.Pipeline{}, err
 	}
 	pipeline = append(pipeline, userPipeline...)
-	if m.AutoTimeSort {
+	if m.QueryType == queryTypeTimeseries && m.AutoTimeSort {
 		pipeline = append(pipeline, bson.D{
 			bson.E{
 				Key:   "$sort",
@@ -139,30 +155,34 @@ func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, 
 
 func (m *queryModel) getLabels(doc map[string]interface{}) data.Labels {
 	labels := make(map[string]string, len(m.LabelFields))
-	for _, labelKey := range m.LabelFields {
-		labelValue, ok := doc[labelKey]
-		if ok {
-			labels[labelKey] = fmt.Sprintf("%v", labelValue)
+	if m.QueryType == queryTypeTimeseries {
+		for _, labelKey := range m.LabelFields {
+			labelValue, ok := doc[labelKey]
+			if ok {
+				labels[labelKey] = fmt.Sprintf("%v", labelValue)
+			}
 		}
 	}
 	return data.Labels(labels)
 }
 
 func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error) {
-	values := make([]interface{}, 0, len(m.ValueFields)+1)
-	timestamp, ok := doc[m.TimestampField]
-	if !ok {
-		return nil, fmt.Errorf("All documents must have the Timestamp Field present")
+	values := make([]interface{}, 0, m.numValues())
+	if m.QueryType == queryTypeTimeseries {
+		timestamp, ok := doc[m.TimestampField]
+		if !ok {
+			return nil, fmt.Errorf("All documents must have the Timestamp Field present")
+		}
+		primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
+		if !(isPrim) {
+			return nil, fmt.Errorf("Timestamps must be bson DateTimes")
+		}
+		var convertedTimestamp time.Time
+		if isPrim {
+			convertedTimestamp = primTimestamp.Time()
+		}
+		values = append(values, convertedTimestamp)
 	}
-	primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
-	if !(isPrim) {
-		return nil, fmt.Errorf("Timestamps must be bson DateTimes")
-	}
-	var convertedTimestamp time.Time
-	if isPrim {
-		convertedTimestamp = primTimestamp.Time()
-	}
-	values = append(values, convertedTimestamp)
 	for _, valueKey := range m.ValueFields {
 		valueValue, ok := doc[valueKey]
 		if !ok {
@@ -174,23 +194,6 @@ func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error
 		}
 	}
 	return values, nil
-}
-
-func (m *queryModel) getCountPipelineTail() (mongo.Pipeline, error) {
-	id := bson.D{}
-	for _, field := range m.LabelFields {
-		id = append(id, bsonPrim.E{Key: field, Value: "$" + field})
-	}
-	stage := bson.D{
-		{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: id},
-			{Key: "count", Value: bson.D{
-				{Key: "$sum", Value: 1},
-			}},
-		}},
-	}
-
-	return mongo.Pipeline{stage}, nil
 }
 
 type jsonData struct {
@@ -245,6 +248,7 @@ func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc
 	if !ok {
 		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
 		frame = data.NewFrameOfFieldTypes(labelsID, 0, fieldTypes...)
+		frame.SetFieldNames(qm.ValueFields...)
 		frames[labelsID] = frame
 	}
 	row, err := m.getValues(doc)
@@ -276,8 +280,16 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	if len(qm.ValueFields)+1 != len(fieldTypes) {
-		response.Error = fmt.Errorf("Value Fields and Value Field Types must be the same length (%d vs %d)", len(qm.ValueFields), len(fieldTypes)-1)
+	numUserTypes := len(fieldTypes)
+	if qm.QueryType == queryTypeTimeseries {
+		numUserTypes--
+	}
+	if qm.numValues() != len(fieldTypes) {
+		response.Error = fmt.Errorf(
+			"Value Fields and Value Field Types must be the same length (%d vs %d)",
+			qm.numValues(),
+			numUserTypes,
+		)
 		return response
 	}
 
