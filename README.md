@@ -93,11 +93,19 @@ export INTEGRATION_TEST_DEV_MODE=
 integration-test/run.sh
 ```
 
+## Limitations
+
+* Only `aggregate` queries are supported, but you can emulate find() et al using various pipeline stages. Supporting find would likely require implementing a graphical query editor to prevent fragility.
+* Grafana's data system requires that all values in a column be the same type. As such, queries from this plugin expect that a field will have the same type in all returned documents.
+* Currently, you need to specify the types of each value field. This will hopefully be addressed in a later update to enable schema inference.
+* Grafana only allows label values to be strings. For performance, this plugin considers, for example, integer 0 and string "0" to be the same label.
+* Only anonymous and Username/Password authentication is supported.
+
 ## Help Wanted
 
 Do you know about any of the following topics? If so, I'd love to hear from you!
 
 * React.js - Making the query editor UI not an eyesore
-* MongodB - Providing representative sample data sets and queries to improve automated tests
-
-
+* MongodB - Providing representative sample data sets and queries to improve automated tests. Implementing other authentication types.
+* Grafana - Sample dashboards using the sample datasets
+* All three - Investigating implementing a graphical query builder.
