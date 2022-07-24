@@ -55,6 +55,12 @@ export class QueryEditor extends PureComponent<Props> {
     onRunQuery();
   };
 
+  onTimestampFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, timestampFormat: event.target.value });
+    // executes the query
+    onRunQuery();
+  };
 
   onLabelFieldsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
@@ -144,9 +150,19 @@ export class QueryEditor extends PureComponent<Props> {
               value={query.timestampField || ''}
               onChange={this.onTimestampFieldChange}
               label="Timestamp Field"
-              tooltip="Field to expect in every document containing a unix millis timestamp or ISO timestamp"
+              tooltip="Field to expect in every document containing the timestamp"
             />
           </div>
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={query.timestampFormat || ''}
+              onChange={this.onTimestampFormatChange}
+              label="Timestamp Format"
+              tooltip="If blank, assume timestamps are native BSON timestamps. Otherwise, parse the timestamp as a string in the format described here: https://pkg.go.dev/time#Parse"
+            />
+          </div>
+
           <div className="gf-form">
             <FormField
               labelWidth={this.labelWidth}

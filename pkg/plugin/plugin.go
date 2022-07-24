@@ -84,6 +84,7 @@ type queryModel struct {
 	Collection      string    `json:"collection"`
 	QueryType       queryType `json:"queryType"`
 	TimestampField  string    `json:"timestampField"`
+	TimestampFormat string    `json:"timestampFormat"`
 	LabelFields     []string  `json:"labelFields"`
 	ValueFields     []string  `json:"valueFields"`
 	ValueFieldTypes []string  `json:"valueFieldTypes"`
@@ -168,18 +169,30 @@ func (m *queryModel) getLabels(doc map[string]interface{}) data.Labels {
 
 func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error) {
 	values := make([]interface{}, 0, m.numValues())
+	var err error
 	if m.QueryType == queryTypeTimeseries {
 		timestamp, ok := doc[m.TimestampField]
 		if !ok {
 			return nil, fmt.Errorf("All documents must have the Timestamp Field present")
 		}
-		primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
-		if !(isPrim) {
-			return nil, fmt.Errorf("Timestamps must be bson DateTimes")
-		}
 		var convertedTimestamp time.Time
-		if isPrim {
-			convertedTimestamp = primTimestamp.Time()
+		if m.TimestampFormat == "" {
+			primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
+			if !isPrim {
+				return nil, fmt.Errorf("Timestamps must be bson DateTimes")
+			}
+			if isPrim {
+				convertedTimestamp = primTimestamp.Time()
+			}
+		} else {
+			stringTimestamp, isString := timestamp.(string)
+			if !isString {
+				return nil, fmt.Errorf("Timestamps must be strings when Timestamp Format is supplied")
+			}
+			convertedTimestamp, err = time.Parse(m.TimestampFormat, stringTimestamp)
+			if err != nil {
+				return nil, err
+			}
 		}
 		values = append(values, convertedTimestamp)
 	}
@@ -230,6 +243,28 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	return mongoClient, "", nil, nil
 }
 
+func (m *queryModel) getLabelsID(labels data.Labels) string {
+	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
+	// labelsID := fmt.Sprintf("%#v", map[string]string(labels))
+	if len(m.LabelFields) == 0 {
+		return ""
+	}
+	labelsID := fmt.Sprintf("%s=%s", m.LabelFields[0], labels[m.LabelFields[0]])
+	for _, label := range m.LabelFields[1:] {
+		labelsID += fmt.Sprintf(",%s=%s", label, labels[label])
+	}
+	return labelsID
+}
+
+func (m *queryModel) getFrameFieldNames(labelsID string) []string {
+	fieldNames := make([]string, 0, m.numValues())
+	if m.QueryType == queryTypeTimeseries {
+		fieldNames = append(fieldNames, m.TimestampField)
+	}
+	fieldNames = append(fieldNames, m.ValueFields...)
+	return fieldNames
+}
+
 func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc timestepDocument, fieldTypes []data.FieldType) (err error) {
 	defer func() {
 		if panic_ := recover(); panic_ != nil {
@@ -242,13 +277,12 @@ func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc
 		}
 	}()
 	labels := m.getLabels(doc)
-	labelsID := fmt.Sprintf("%#v", labels)
-	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
+	labelsID := m.getLabelsID(labels)
 	frame, ok := frames[labelsID]
 	if !ok {
 		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
 		frame = data.NewFrameOfFieldTypes(labelsID, 0, fieldTypes...)
-		frame.SetFieldNames(qm.ValueFields...)
+		frame.SetFieldNames(m.getFrameFieldNames(labelsID)...)
 		frames[labelsID] = frame
 	}
 	row, err := m.getValues(doc)

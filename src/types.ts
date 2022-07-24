@@ -4,6 +4,7 @@ export interface MongoDBQuery extends DataQuery {
   database: string;
   collection: string;
   timestampField: string;
+  timestampFormat: string;
   labelFields: string[];
   valueFields: string[];
   valueFieldTypes: string[];
@@ -22,6 +23,7 @@ export const defaultQuery: Partial<MongoDBQuery> = {
     collection: "my_collection",
     queryType: MongoDBQueryType.Timeseries,
     timestampField: "timestamp",
+    timestampFormat: "",
     labelFields: [ "sensorID" ],
     valueFields: [ "measurement" ],
     valueFieldTypes: [ "float64" ],
