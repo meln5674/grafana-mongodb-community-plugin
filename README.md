@@ -56,7 +56,7 @@ GF_INSTALL_PLUGINS=meln5674-mongodb-community=<your repository url>/meln5674-mon
 
 Consult your grafana distribution documentation (e.g. https://github.com/bitnami/charts/tree/master/bitnami/grafana) for how to specify plugins to install
 
-#### Development
+## Development
 
 Copy built repository to `<grafana plugins dir>/meln5674-mongodb-community`
 
@@ -82,15 +82,19 @@ yarn integration-test
 ```
 
 Grafana credentials: admin/admin
+
 MongoDD credentials: root/root
-MongoDB Test dataset: test.weather { "metadata": { "sensorId": int, "type": string }, "timestamp": ISODate(...), "value": int }
+
+MongoDB Test datasets:
+
+`test.weather { "metadata": { "sensorId": int, "type": string }, "timestamp": ISODate(...), "value": int }`
 
 Cleanup:
 
 ```bash
 export INTEGRATION_TEST_NO_CLEANUP=
 export INTEGRATION_TEST_DEV_MODE=
-integration-test/run.sh
+yarn integration-test
 ```
 
 ## Limitations
@@ -106,6 +110,6 @@ integration-test/run.sh
 Do you know about any of the following topics? If so, I'd love to hear from you!
 
 * React.js - Making the query editor UI not an eyesore
-* MongodB - Providing representative sample data sets and queries to improve automated tests. Implementing other authentication types.
+* MongoDB - Providing representative sample data sets and queries to improve automated tests. Implementing other authentication types.
 * Grafana - Sample dashboards using the sample datasets
 * All three - Investigating implementing a graphical query builder.
