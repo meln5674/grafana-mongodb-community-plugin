@@ -2,7 +2,7 @@ ARG BASE_IMAGE=docker.io/library/debian:9
 
 FROM ${BASE_IMAGE} AS base
 
-RUN apt-get update && apt-get install -y zip unzip curl xz-utils git
+RUN apt-get update && apt-get install -y curl xz-utils git
 
 ENV PATH=${PATH}:/usr/local/lib/nodejs/bin:/usr/local/go/bin:/gopath/bin
 ENV GOPATH=/gopath
@@ -52,10 +52,15 @@ COPY --from=go ${GOPATH} ${GOPATH}
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=kind /usr/local/bin/kind /usr/local/bin/kind
 
+RUN apt-get install -y gcc g++ zip unzip make
+
 RUN node --version \
  && npm --version \
  && yarn --version \
  && go version \
  && mage --help \
  && zip --version \
+ && gcc --version \
+ && g++ --version \
+ && make --version \
  && unzip -h
