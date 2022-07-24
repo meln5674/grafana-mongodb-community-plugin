@@ -1,16 +1,18 @@
 import { defaults } from 'lodash';
 
 import React, { ChangeEvent, PureComponent, SyntheticEvent } from 'react';
-import { LegacyForms } from '@grafana/ui';
+import { LegacyForms, Tooltip, InlineFormLabel, Icon } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 import { DataSource } from './datasource';
 import { defaultQuery, MongoDBDataSourceOptions, MongoDBQuery } from './types';
-const { FormField, Switch } = LegacyForms;
+const { FormField, Input, Switch } = LegacyForms;
 
 
 type Props = QueryEditorProps<DataSource, MongoDBQuery, MongoDBDataSourceOptions>;
 
 export class QueryEditor extends PureComponent<Props> {
+  labelWidth = 12;
+
   onDatabaseChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query } = this.props;
     onChange({ ...query, database: event.target.value });
@@ -82,7 +84,7 @@ export class QueryEditor extends PureComponent<Props> {
       <div className="gf-form-group">
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={query.database || ''}
           onChange={this.onDatabaseChange}
           label="Database"
@@ -91,7 +93,7 @@ export class QueryEditor extends PureComponent<Props> {
 
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={query.collection || ''}
           onChange={this.onCollectionChange}
           label="Collection"
@@ -100,7 +102,7 @@ export class QueryEditor extends PureComponent<Props> {
       </div>
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={query.timestampField || ''}
           onChange={this.onTimestampFieldChange}
           label="Timestamp Field"
@@ -109,7 +111,7 @@ export class QueryEditor extends PureComponent<Props> {
       </div>
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={(query.labelFields || []).join(",")}
           onChange={this.onLabelFieldsChange}
           label="Label Fields"
@@ -119,7 +121,7 @@ export class QueryEditor extends PureComponent<Props> {
 
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={(query.valueFields || []).join(",")}
           onChange={this.onValueFieldsChange}
           label="Value Fields"
@@ -129,7 +131,7 @@ export class QueryEditor extends PureComponent<Props> {
 
       <div className="gf-form">
         <FormField
-          labelWidth={8}
+          labelWidth={this.labelWidth}
           value={(query.valueFieldTypes || []).join(",")}
           onChange={this.onValueFieldTypesChange}
           label="Value Field Types"
@@ -138,12 +140,16 @@ export class QueryEditor extends PureComponent<Props> {
       </div>
 
       <div className="gf-form">
-        <FormField
-          labelWidth={8}
+        <InlineFormLabel
+                width={this.labelWidth}
+                tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects"
+        >
+        Aggregation
+        </InlineFormLabel>
+        <Input
           value={query.aggregation || ''}
           onChange={this.onAggregationChange}
           label="Aggregation"
-          tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects"
         />
       </div>
 
@@ -153,6 +159,14 @@ export class QueryEditor extends PureComponent<Props> {
           onChange={this.onAutoTimeBoundChange}
           label="Automatic Time-Bound"
         />
+        <Tooltip
+                placement="top"
+                content="Add a stage at the beginning to $match documents where Timestamp Field is within the current dashboard time range"
+                theme={'info'}>
+          <div className="gf-form-help-icon gf-form-help-icon--right-normal">
+            <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+          </div>
+        </Tooltip>
       </div>
       <div className="gf-form">
         <Switch
@@ -160,6 +174,14 @@ export class QueryEditor extends PureComponent<Props> {
           onChange={this.onAutoTimeSortChange}
           label="Automatic Time-Sort"
         />
+        <Tooltip
+                placement="top"
+                content="Add a stage at the end to $sort documents ascending by Timestamp Field"
+                theme={'info'}>
+          <div className="gf-form-help-icon gf-form-help-icon--right-normal">
+            <Icon name="info-circle" size="sm" style={{ marginLeft: '10px' }} />
+          </div>
+        </Tooltip>
       </div>
 
       </div>
