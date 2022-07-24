@@ -56,6 +56,14 @@ metadata:
 stringData:
   datasources.yaml: |
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasources.yaml; set -x)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboards
+data:
+  retweets.json: |
+$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/dashboards/retweets.json; set -x)
 EOF
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -89,6 +97,9 @@ GRAFANA_ARGS=(
     --set admin.password=admin
     --set config.grafanaIniConfigMap=grafana-ini
     --set config.useGrafanaIniFile=true
+    --set dashboardsProvider.enabled=true
+    --set dashboardsConfigMaps[0].configMapName=dashboards
+    --set dashboardsConfigMaps[0].fileName=retweets.json
     # --set image.tag=7.1.5-debian-10-r9
 )
 

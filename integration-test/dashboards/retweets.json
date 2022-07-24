@@ -1,0 +1,205 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "meln5674-mongodb-community",
+        "uid": "GLlI6wg4z"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 21,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "aggregation": "[{\"$project\":{\"created_at\":1,\"user_url\":\"$user.url\",\"retweet_count\":1,\"_id\":0}}, { \"$match\": { \"user_url\" : { \"$in\": ${user_url}  } }  }  ]",
+          "autoTimeBound": false,
+          "autoTimeSort": false,
+          "collection": "tweets",
+          "database": "twitter",
+          "datasource": {
+            "type": "meln5674-mongodb-community",
+            "uid": "GLlI6wg4z"
+          },
+          "labelFields": [
+            "user_url"
+          ],
+          "queryType": "Timeseries",
+          "refId": "A",
+          "timestampField": "created_at",
+          "timestampFormat": "Mon Jan 02 15:04:05 -0700 2006",
+          "valueFieldTypes": [
+            "float64"
+          ],
+          "valueFields": [
+            "retweet_count"
+          ]
+        }
+      ],
+      "title": "Retweets",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": false,
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "mongodb",
+          "value": "mongodb"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "meln5674-mongodb-community",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "http://t.co/3Xvuxw2JEG",
+            "http://t.co/Lg7nFDkidP",
+            "http://t.co/vVcENSGcDg"
+          ],
+          "value": [
+            "http://t.co/3Xvuxw2JEG",
+            "http://t.co/Lg7nFDkidP",
+            "http://t.co/vVcENSGcDg"
+          ]
+        },
+        "datasource": {
+          "type": "meln5674-mongodb-community",
+          "uid": "${datasource}"
+        },
+        "definition": "twitter (tweets)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "name": "user_url",
+        "options": [],
+        "query": {
+          "aggregation": "[{\"$group\":{\"_id\":\"$user.url\"}},{\"$match\": { \"_id\": { \"$ne\": null } } }]",
+          "collection": "tweets",
+          "database": "twitter",
+          "fieldName": "_id",
+          "fieldType": "string"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2015-04-25T15:15:20.000Z",
+    "to": "2015-05-03T09:04:17.000Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Retweets",
+  "version": 0,
+  "weekStart": ""
+}

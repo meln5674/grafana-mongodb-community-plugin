@@ -41,6 +41,14 @@ export const defaultQuery: Partial<MongoDBQuery> = {
     autoTimeSort: false
 };
 
+export interface MongoDBVariableQuery {
+    database: string;
+    collection: string;
+    aggregation: string;
+    fieldName: string;
+    fieldType: string;
+};
+
 /**
  * These are options configured for each DataSource instance.
  */
