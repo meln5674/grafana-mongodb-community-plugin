@@ -16,7 +16,7 @@ RUN curl -vfL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kube
 
 FROM base AS node
 
-ARG NODE_VERSION=v14.4.0
+ARG NODE_VERSION=v14.20.0
 
 RUN mkdir -p /usr/local/lib/nodejs \
  && curl -vfL https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz | tar -xJ --strip-components=1 -C /usr/local/lib/nodejs \
