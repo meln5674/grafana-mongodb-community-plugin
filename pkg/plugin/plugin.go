@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	bsonPrim "go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	mongoOpts "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -225,7 +226,7 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	}
 
 	username, hasUsername := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["username"]
-	password, hasPassword := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["username"]
+	password, hasPassword := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["password"]
 
 	if hasUsername {
 		if hasPassword {
@@ -235,7 +236,12 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 		}
 	}
 
-	mongoClient, err := mongo.Connect(ctx, mongoOpts.Client().ApplyURI(mongoURL.String()))
+	credential := options.Credential{
+		Username: username,
+		Password: password,
+	}
+
+	mongoClient, err := mongo.Connect(ctx, mongoOpts.Client().ApplyURI(mongoURL.String()).SetAuth(credential))
 	if err != nil {
 		return nil, "Error while connecting to MongoDB: ", err, nil
 	}
