@@ -75,9 +75,10 @@ NGINX_ARGS=(
     --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/
     --set extraVolumeMounts[0].name=plugin
     --set extraVolumeMounts[0].mountPath=/opt/bitnami/nginx/html/grafana-mongodb-community-plugin/
+    --set service.type=ClusterIP
 )
 
-helm upgrade --install plugin-repo bitnami/nginx "${NGINX_ARGS[@]}"
+helm upgrade --install --wait plugin-repo bitnami/nginx "${NGINX_ARGS[@]}"
 
 MONGODB_ARGS=(
     --version 12.1.26
@@ -90,7 +91,7 @@ MONGODB_ARGS=(
     --set extraVolumeMounts[0].mountPath=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
 )
 
-helm upgrade --install mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
+helm upgrade --install --wait mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
 
 GRAFANA_ARGS=(
     --set datasources.secretName=datasources
@@ -118,7 +119,7 @@ fi
 
 
 
-helm upgrade --install grafana bitnami/grafana "${GRAFANA_ARGS[@]}"
+helm upgrade --install --wait grafana bitnami/grafana "${GRAFANA_ARGS[@]}"
 
         
 if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
