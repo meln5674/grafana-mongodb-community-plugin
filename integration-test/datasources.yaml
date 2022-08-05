@@ -7,5 +7,5 @@ datasources:
     url: mongodb://mongodb:27017
   secureJsonData:
     username: root
-    password: root
+    password: rootPassword
 

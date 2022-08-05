@@ -81,7 +81,7 @@ helm upgrade --install plugin-repo bitnami/nginx "${NGINX_ARGS[@]}"
 
 MONGODB_ARGS=(
     --version 12.1.26
-    --set auth.rootPassword=root
+    --set auth.rootPassword=rootPassword
     --set initdbScriptsConfigMap=mongodb-init
     --set useStatefulSet=true
     --set extraVolumes[0].name=sample-data
@@ -94,7 +94,7 @@ helm upgrade --install mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
 
 GRAFANA_ARGS=(
     --set datasources.secretName=datasources
-    --set admin.password=admin
+    --set admin.password=adminPassword
     --set config.grafanaIniConfigMap=grafana-ini
     --set config.useGrafanaIniFile=true
     --set dashboardsProvider.enabled=true
@@ -128,7 +128,7 @@ if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
     echo 'Forwarding ports. Press Ctrl+C to exit and re-run this script to make changes'
     kubectl port-forward deploy/grafana 3000:3000
 else
-    kubectl wait deploy/grafana --for=condition=available --timeout=120s
+    kubectl wait deploy/grafana --for=condition=available --timeout=300s
     kubectl replace --force -f - <<EOF
 
 apiVersion: batch/v1
@@ -146,11 +146,11 @@ spec:
         command: [sh, -exuc]
         args:
         - |
-            curl -v -f -u admin:admin http://grafana:3000/api/datasources/1/health
+            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/1/health
             for query in weather/timeseries weather/table tweets/timeseries; do
                 curl 'http://grafana:3000/api/ds/query' \
                   -v -f \
-                  -u admin:admin \
+                  -u admin:adminPassword \
                   -H 'accept: application/json, text/plain, */*' \
                   -H 'content-type: application/json' \
                   --data-raw "\$(cat /mnt/host/grafana-mongodb-community-plugin/integration-test//queries/\${query}.json)"
