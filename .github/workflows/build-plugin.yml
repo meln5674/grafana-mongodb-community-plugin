@@ -1,0 +1,25 @@
+name: Build Plugin
+
+on:
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: build-env.sh bash -c 'yarn install && yarn build && yarn backend && mage -v && yarn plugin'
+    - name: Create Release
+      uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: "${{ github.ref }}"
+        prerelease: true
+        title: "Testing"
+        files: |
+          meln5674-mongodb-community.zip
