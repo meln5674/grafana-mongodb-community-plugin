@@ -21,6 +21,7 @@ docker build -f build-env.Dockerfile -t "${IMAGE}" .
 DOCKER_RUN_ARGS=(
     --rm
     -i
+    -e GRAFANA_API_KEY
 )
 
 if [ -t 0 ] ; then
