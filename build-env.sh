@@ -20,8 +20,12 @@ docker build -f build-env.Dockerfile -t "${IMAGE}" .
 
 DOCKER_RUN_ARGS=(
     --rm
-    -it
+    -i
 )
+
+if [ -t 0 ] ; then
+    DOCKER_RUN_ARGS+=( -t )
+fi
 
 # Make it look like we're in the same directory as we ran from
 DOCKER_RUN_ARGS+=(
