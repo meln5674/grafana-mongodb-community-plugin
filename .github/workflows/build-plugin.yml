@@ -17,7 +17,9 @@ jobs:
       run: |
         mkdir ./go
         export GOPATH="${PWD}/go"
-        ./build-env.sh bash -c 'yarn install && yarn build && yarn backend && mage -v && yarn plugin'
+        ./build-env.sh bash -c 'yarn install && yarn build && yarn backend && mage -v && yarn plugin && yarn sign'
+      env:
+        GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
     - name: Create Release
       uses: "marvinpinto/action-automatic-releases@latest"
       with:
