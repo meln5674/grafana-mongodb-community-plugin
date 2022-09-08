@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: build-env.sh bash -c 'yarn install && yarn build && yarn backend && mage -v && yarn plugin'
+      run: ./build-env.sh bash -c 'yarn install && yarn build && yarn backend && mage -v && yarn plugin'
     - name: Create Release
       uses: "marvinpinto/action-automatic-releases@latest"
       with:
