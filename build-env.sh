@@ -1,4 +1,4 @@
-#!/bin/bash -xeu
+#!/bin/bash -xe
 
 # Assume the user wants an interactive shell if no args are passed, otherwise, run the provided command
 if [ "$#" -eq 0 ]; then
