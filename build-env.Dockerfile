@@ -64,3 +64,6 @@ RUN node --version \
  && g++ --version \
  && make --version \
  && unzip -h
+ 
+ENV GOPATH=/go
+VOLUME /go
