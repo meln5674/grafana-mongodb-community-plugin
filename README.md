@@ -114,3 +114,10 @@ Do you know about any of the following topics? If so, I'd love to hear from you!
 * Grafana - Sample dashboards using the sample datasets
 * All three - Investigating implementing a graphical query builder.
 * Github - Implementing automated releases
+
+## Acknowledgements
+
+Thank you to the following individuals/groups
+
+* [James Osgood](https://github.com/JamesOsgood/) for writing the original plugin which inspired this one
+* [Nikolay Stankov](https://github.com/nstankov-bg/) for PRs [1](https://github.com/meln5674/grafana-mongodb-community-plugin/pull/1)
