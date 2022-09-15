@@ -93,6 +93,10 @@ MONGODB_ARGS=(
 
 helm upgrade --install --wait mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
 
+MONGODB_ARGS+=( --set auth.enabled=false )
+
+helm upgrade --install --wait mongodb-no-auth bitnami/mongodb "${MONGODB_ARGS[@]}"
+
 GRAFANA_ARGS=(
     --set datasources.secretName=datasources
     --set admin.password=adminPassword
@@ -148,6 +152,7 @@ spec:
         args:
         - |
             curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/1/health
+            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/2/health
             for query in weather/timeseries weather/table tweets/timeseries; do
                 curl 'http://grafana:3000/api/ds/query' \
                   -v -f \

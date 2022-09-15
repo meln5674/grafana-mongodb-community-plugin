@@ -220,28 +220,32 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	if err != nil {
 		return nil, "", nil, err
 	}
+	opts := mongoOpts.Client()
+
 	mongoURL, err := url.Parse(data.URL)
 	if err != nil {
 		return nil, "Invalid URL: ", err, nil
 	}
 
+	opts = opts.ApplyURI(mongoURL.String())
 	username, hasUsername := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["username"]
 	password, hasPassword := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["password"]
 
-	if hasUsername {
-		if hasPassword {
+	if hasUsername && username != "" {
+		if hasPassword && password != "" {
 			mongoURL.User = url.UserPassword(username, password)
 		} else {
 			mongoURL.User = url.User(username)
 		}
+
+		credential := options.Credential{
+			Username: username,
+			Password: password,
+		}
+		opts = opts.SetAuth(credential)
 	}
 
-	credential := options.Credential{
-		Username: username,
-		Password: password,
-	}
-
-	mongoClient, err := mongo.Connect(ctx, mongoOpts.Client().ApplyURI(mongoURL.String()).SetAuth(credential))
+	mongoClient, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, "Error while connecting to MongoDB: ", err, nil
 	}

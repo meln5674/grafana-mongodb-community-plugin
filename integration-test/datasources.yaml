@@ -8,4 +8,9 @@ datasources:
   secureJsonData:
     username: root
     password: rootPassword
+- name: mongodb-no-auth
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb-no-auth:27017
 
