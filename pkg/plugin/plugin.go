@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/pkg/errors"
 
 	"go.mongodb.org/mongo-driver/bson"
 	bsonPrim "go.mongodb.org/mongo-driver/bson/primitive"
@@ -139,9 +140,9 @@ func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, 
 	}
 
 	userPipeline := mongo.Pipeline{}
-	err := bson.UnmarshalExtJSON([]byte(m.Aggregation), true, &userPipeline)
+	err := bson.UnmarshalExtJSON([]byte(m.Aggregation), false, &userPipeline)
 	if err != nil {
-		return mongo.Pipeline{}, err
+		return mongo.Pipeline{}, errors.Wrap(err, "Failed to parse aggregation pipeline")
 	}
 	pipeline = append(pipeline, userPipeline...)
 	if m.QueryType == queryTypeTimeseries && m.AutoTimeSort {
@@ -152,7 +153,7 @@ func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, 
 			},
 		})
 	}
-	return pipeline, err
+	return pipeline, nil
 }
 
 func (m *queryModel) getLabels(doc map[string]interface{}) data.Labels {
@@ -192,7 +193,7 @@ func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error
 			}
 			convertedTimestamp, err = time.Parse(m.TimestampFormat, stringTimestamp)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "Could not parse timestamp")
 			}
 		}
 		values = append(values, convertedTimestamp)
@@ -214,17 +215,17 @@ type jsonData struct {
 	URL string `json:"url"`
 }
 
-func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Client, errMsg string, err error, internalErr error) {
+func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Client, err error, internalErr error) {
 	data := jsonData{}
 	err = json.Unmarshal([]byte(pCtx.DataSourceInstanceSettings.JSONData), &data)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, errors.Wrap(err, "Failed to parse data source settings")
 	}
 	opts := mongoOpts.Client()
 
 	mongoURL, err := url.Parse(data.URL)
 	if err != nil {
-		return nil, "Invalid URL: ", err, nil
+		return nil, errors.Wrap(err, fmt.Sprintf("Invalid Datasource URL %s", data.URL)), nil
 	}
 
 	opts = opts.ApplyURI(mongoURL.String())
@@ -247,10 +248,10 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 
 	mongoClient, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		return nil, "Error while connecting to MongoDB: ", err, nil
+		return nil, errors.Wrap(err, "Error while connecting to MongoDB"), nil
 	}
 
-	return mongoClient, "", nil, nil
+	return mongoClient, nil, nil
 }
 
 func (m *queryModel) getLabelsID(labels data.Labels) string {
@@ -297,7 +298,7 @@ func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc
 	}
 	row, err := m.getValues(doc)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to extract value columns")
 	}
 	frame.AppendRow(row...)
 
@@ -314,13 +315,13 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 	var err error
 	err = json.Unmarshal(query.JSON, &qm)
 	if err != nil {
-		response.Error = err
+		response.Error = errors.Wrap(err, "Invalid query JSON")
 		return response
 	}
 
 	fieldTypes, err := qm.getFieldTypes()
 	if err != nil {
-		response.Error = err
+		response.Error = errors.Wrap(err, "Could not determine field types")
 		return response
 	}
 
@@ -339,17 +340,17 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 
 	pipeline, err := qm.getPipeline(query.TimeRange.From, query.TimeRange.To)
 	if err != nil {
-		response.Error = err
+		response.Error = errors.Wrap(err, "Failed to produce final pipeline")
 		return response
 	}
 
-	mongoClient, _, err, internalErr := connect(ctx, pCtx)
+	mongoClient, err, internalErr := connect(ctx, pCtx)
 	if internalErr != nil {
-		response.Error = internalErr
+		response.Error = errors.Wrap(internalErr, "Internal failure while connecting to mongo")
 		return response
 	}
 	if err != nil {
-		response.Error = err
+		response.Error = errors.Wrap(err, "Failed to connect to mongo")
 		return response
 	}
 	defer mongoClient.Disconnect(ctx)
@@ -361,14 +362,14 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 	log.DefaultLogger.Info("Querying MongoDB", "context", pCtx, "query", query, "pipeline", pipeline)
 	cursor, err := collection.Aggregate(ctx, pipeline)
 	if err != nil {
-		response.Error = err
+		response.Error = errors.Wrap(err, "Failed to send query to mongo")
 		return response
 	}
 	for cursor.Next(ctx) {
 		doc := timestepDocument{}
 		err = cursor.Decode(&doc)
 		if err != nil {
-			response.Error = err
+			response.Error = errors.Wrap(err, "Failed to parse document")
 			return response
 		}
 		err = qm.parseQueryResultDocument(frames, doc, fieldTypes)
@@ -378,7 +379,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		}
 	}
 	if cursor.Err() != nil {
-		response.Error = cursor.Err()
+		response.Error = errors.Wrap(cursor.Err(), "Failed to get next result document")
 		return response
 	}
 
@@ -402,13 +403,13 @@ func (d *MongoDBDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 		Status:  backend.HealthStatusOk,
 		Message: "MongoDB is Responding",
 	}
-	mongoClient, errMsg, err, internalErr := connect(ctx, req.PluginContext)
+	mongoClient, err, internalErr := connect(ctx, req.PluginContext)
 	if internalErr != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to connect to mongo")
 	}
 	if err != nil {
 		result.Status = backend.HealthStatusError
-		result.Message = errMsg + err.Error()
+		result.Message = err.Error()
 		return &result, nil
 	}
 	defer mongoClient.Disconnect(ctx)

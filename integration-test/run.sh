@@ -153,7 +153,7 @@ spec:
         - |
             curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/1/health
             curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/2/health
-            for query in weather/timeseries weather/table tweets/timeseries; do
+            for query in weather/timeseries weather/timeseries-date weather/table tweets/timeseries; do
                 curl 'http://grafana:3000/api/ds/query' \
                   -v -f \
                   -u admin:adminPassword \
