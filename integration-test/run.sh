@@ -16,6 +16,9 @@
 if ! [ -f integration-test/datasets/download/tweets.zip ]; then
     curl -vfL https://github.com/ozlerhakan/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true > integration-test/datasets/download/tweets.zip
 fi
+if ! [ -f integration-test/datasets/download/transactions.json ]; then
+    curl -vfL https://github.com/fieldsets/mongodb-sample-datasets/blob/main/sample_analytics/transactions.json?raw=true > integration-test/datasets/download/transactions.json
+fi
 rm -rf integration-test/datasets/download/tweets
 unzip integration-test/datasets/download/tweets.zip -d integration-test/datasets/download/tweets/
 
@@ -40,6 +43,8 @@ data:
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/weather.js; set +x)
   tweets.sh: |
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/tweets.sh; set +x)
+  transations.sh: |
+$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/transactions.sh; set +x)
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -60,10 +65,18 @@ $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-te
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: dashboards
+  name: dashboard-retweets
 data:
   retweets.json: |
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/dashboards/retweets.json; set -x)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-transactions
+data:
+  transactions.json: |
+$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/dashboards/transactions.json; set -x)
 EOF
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -103,8 +116,10 @@ GRAFANA_ARGS=(
     --set config.grafanaIniConfigMap=grafana-ini
     --set config.useGrafanaIniFile=true
     --set dashboardsProvider.enabled=true
-    --set dashboardsConfigMaps[0].configMapName=dashboards
+    --set dashboardsConfigMaps[0].configMapName=dashboard-retweets
     --set dashboardsConfigMaps[0].fileName=retweets.json
+    --set dashboardsConfigMaps[1].configMapName=dashboard-transactions
+    --set dashboardsConfigMaps[1].fileName=transactions.json
     # --set image.tag=7.1.5-debian-10-r9
 )
 

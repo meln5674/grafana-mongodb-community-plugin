@@ -1,0 +1,243 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "meln5674-mongodb-community",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 25,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\", \"total\": { \"$toDouble\": \"$transactions.total\"  }}}, { \"$match\": { \"code\": { \"$in\": $code }, \"symbol\": { \"$in\": $symbol } } } ]",
+          "autoTimeBound": false,
+          "autoTimeSort": true,
+          "collection": "transactions",
+          "database": "analytics",
+          "datasource": {
+            "type": "meln5674-mongodb-community",
+            "uid": "${datasource}"
+          },
+          "labelFields": [
+            "code",
+            "symbol"
+          ],
+          "queryType": "Timeseries",
+          "refId": "A",
+          "timestampField": "date",
+          "timestampFormat": "",
+          "valueFieldTypes": [
+            "float64"
+          ],
+          "valueFields": [
+            "total"
+          ]
+        }
+      ],
+      "title": "Transactions",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": false,
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "mongodb",
+          "value": "mongodb"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "meln5674-mongodb-community",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "amd",
+            "ibm",
+            "msft"
+          ],
+          "value": [
+            "amd",
+            "ibm",
+            "msft"
+          ]
+        },
+        "datasource": {
+          "type": "meln5674-mongodb-community",
+          "uid": "${datasource}"
+        },
+        "definition": "analytics (transactions)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "symbol",
+        "options": [],
+        "query": {
+          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\"} }, { \"$match\": { \"date\": { \"$gte\": { \"$date\": \"${__from:date}\" }, \"$lte\" : { \"$date\": \"${__to:date}\" } } } } ]",
+          "collection": "transactions",
+          "database": "analytics",
+          "fieldName": "symbol",
+          "fieldType": "string"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "buy"
+          ],
+          "value": [
+            "buy"
+          ]
+        },
+        "datasource": {
+          "type": "meln5674-mongodb-community",
+          "uid": "${datasource}"
+        },
+        "definition": "analytics (transactions)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "code",
+        "options": [],
+        "query": {
+          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\"} }, { \"$match\": { \"date\": { \"$gte\": { \"$date\": \"${__from:date}\" }, \"$lte\" : { \"$date\": \"${__to:date}\" } } } } ]",
+          "collection": "transactions",
+          "database": "analytics",
+          "fieldName": "code",
+          "fieldType": "string"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "1993-10-24T12:52:03.788Z",
+    "to": "2000-12-15T14:47:01.267Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Transactions",
+  "uid": "SKyKSuOVz",
+  "version": 1,
+  "weekStart": ""
+}
