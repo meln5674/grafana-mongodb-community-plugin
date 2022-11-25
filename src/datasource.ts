@@ -58,6 +58,9 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
     return lastValueFrom(
         this.query(dataQueryRequest)
     ).then((rsp) => {
+        if (rsp.error) {
+            throw new Error(rsp.error.message);
+        }
         if (rsp.data?.length) {
           return frameToMetricFindValue(rsp.data[0]);
         }
