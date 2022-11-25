@@ -1,20 +1,15 @@
 import { lastValueFrom, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { 
     DataSourceInstanceSettings,
-    ScopedVars,
-    DataQuery, 
     DataQueryRequest, 
     DataQueryResponse, 
-    MetricFindValue 
+    MetricFindValue,
+    ScopedVars
 } from '@grafana/data';
 import {
     DataSourceWithBackend, 
-    BackendDataSourceResponse,
-    FetchResponse,
     getTemplateSrv,
-    getBackendSrv,
-    toDataQueryResponse
+    frameToMetricFindValue
 } from '@grafana/runtime';
 import { MongoDBDataSourceOptions, MongoDBQuery, MongoDBQueryType, MongoDBVariableQuery } from './types';
 
@@ -31,6 +26,7 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
     };
   }
 
+
   query(request: DataQueryRequest<MongoDBQuery>): Observable<DataQueryResponse> {
       const templateSrv = getTemplateSrv();
       templateSrv.updateTimeRange(request.range);
@@ -38,7 +34,8 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
   }
 
   async metricFindQuery(query: MongoDBVariableQuery, options?: any): Promise<MetricFindValue[]> {
-    const request: Partial<MongoDBQuery> = {
+    const target: Partial<MongoDBQuery> = {
+        refId: 'metricFindQuery',
         database: query.database,
         collection: query.collection,
         queryType: MongoDBQueryType.Table,
@@ -51,27 +48,20 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
         autoTimeBound: false,
         autoTimeSort: false
     }
-    const refId = request.refId || 'variable-query';
-    const queries: DataQuery[] = [{ ...request, datasource: this.getRef(), refId }];
 
-    const frame = await lastValueFrom(getBackendSrv().fetch<BackendDataSourceResponse>({
-      url: '/api/ds/query',
-      method: 'POST',
-      data: {
-        queries,
-      },
-      requestId: refId,
-    })
-    .pipe(
-      map((res: FetchResponse<BackendDataSourceResponse>) => {
-        const rsp = toDataQueryResponse(res, queries);
-        return rsp.data[0];
-      })
-    ));
+    let dataQuery = {
+        ...options,
+        targets: [target]
+    }
+    let dataQueryRequest = dataQuery as DataQueryRequest<MongoDBQuery>
 
-    return frame.fields[0].values.buffer.map((value: any) => {
-        const metricValue: MetricFindValue = { text: value.toString() };
-        return metricValue
+    return lastValueFrom(
+        this.query(dataQueryRequest)
+    ).then((rsp) => {
+        if (rsp.data?.length) {
+          return frameToMetricFindValue(rsp.data[0]);
+        }
+        return [];
     });
   }
 }

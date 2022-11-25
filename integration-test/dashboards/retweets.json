@@ -30,7 +30,7 @@
     {
       "datasource": {
         "type": "meln5674-mongodb-community",
-        "uid": "GLlI6wg4z"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -109,7 +109,7 @@
           "database": "twitter",
           "datasource": {
             "type": "meln5674-mongodb-community",
-            "uid": "GLlI6wg4z"
+            "uid": "${datasource}"
           },
           "labelFields": [
             "user_url"

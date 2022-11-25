@@ -129,7 +129,7 @@ helm upgrade --install --wait grafana bitnami/grafana "${GRAFANA_ARGS[@]}"
 if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
     kubectl rollout restart deploy/grafana
     kubectl rollout status deploy/grafana
-    sleep 2
+    sleep 5
     echo 'Forwarding ports. Press Ctrl+C to exit and re-run this script to make changes'
     kubectl port-forward deploy/grafana 3000:3000
 else
