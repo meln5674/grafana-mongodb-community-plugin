@@ -49,6 +49,16 @@ export interface MongoDBVariableQuery {
     fieldType: string;
 };
 
+export const defaultVariableQuery: Partial<MongoDBVariableQuery> = {
+    database: "my_db",
+    collection: "my_collection",
+    aggregation: JSON.stringify([
+        {"$group":{"_id":"$label", "count": {"$sum":1}}}
+    ]),
+    fieldName: "_id",
+    fieldType: "string"
+};
+
 /**
  * These are options configured for each DataSource instance.
  */

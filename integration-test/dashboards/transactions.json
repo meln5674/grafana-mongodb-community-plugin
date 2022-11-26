@@ -73,8 +73,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -106,7 +105,7 @@
       },
       "targets": [
         {
-          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\", \"total\": { \"$toDouble\": \"$transactions.total\"  }}}, { \"$match\": { \"code\": { \"$in\": $code }, \"symbol\": { \"$in\": $symbol } } } ]",
+          "aggregation": "[\n  { \"$unwind\": \"$transactions\" },\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\",\n    \"total\": { \"$toDouble\": \"$transactions.total\"  }\n  } },\n  { \"$match\": {\n      \"code\": { \"$in\": $code },\n      \"symbol\": { \"$in\": $symbol }\n  } }\n]",
           "autoTimeBound": false,
           "autoTimeSort": true,
           "collection": "transactions",
@@ -183,7 +182,7 @@
         "name": "symbol",
         "options": [],
         "query": {
-          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\"} }, { \"$match\": { \"date\": { \"$gte\": { \"$date\": \"${__from:date}\" }, \"$lte\" : { \"$date\": \"${__to:date}\" } } } } ]",
+          "aggregation": "[\n  {\"$unwind\": \"$transactions\"},\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\"\n  } },\n  { \"$match\": {\n    \"date\": {\n      \"$gte\": { \"$date\": \"${__from:date}\" },\n      \"$lte\" : { \"$date\": \"${__to:date}\" }\n    }\n  } }\n]",
           "collection": "transactions",
           "database": "analytics",
           "fieldName": "symbol",
@@ -216,7 +215,7 @@
         "name": "code",
         "options": [],
         "query": {
-          "aggregation": "[{\"$unwind\": \"$transactions\"},{ \"$project\": { \"date\": \"$transactions.date\", \"symbol\": \"$transactions.symbol\", \"code\": \"$transactions.transaction_code\"} }, { \"$match\": { \"date\": { \"$gte\": { \"$date\": \"${__from:date}\" }, \"$lte\" : { \"$date\": \"${__to:date}\" } } } } ]",
+          "aggregation": "[\n  {\"$unwind\": \"$transactions\"},\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\"\n  } },\n  { \"$match\": {\n    \"date\": {\n      \"$gte\": { \"$date\": \"${__from:date}\" },\n      \"$lte\" : { \"$date\": \"${__to:date}\" }\n    }\n  } }\n]",
           "collection": "transactions",
           "database": "analytics",
           "fieldName": "code",
@@ -238,6 +237,6 @@
   "timezone": "",
   "title": "Transactions",
   "uid": "SKyKSuOVz",
-  "version": 1,
+  "version": 10,
   "weekStart": ""
 }

@@ -1,78 +1,120 @@
-import React, { useState } from 'react';
-import { MongoDBVariableQuery } from './types';
+import { MongoDBVariableQuery, defaultVariableQuery } from './types';
+import { defaults } from 'lodash';
+import React, { ChangeEvent, PureComponent } from 'react';
+import { 
+  Input,
+  InlineField,
+  InlineFormLabel,
+  InlineFieldRow,
+  CodeEditor,
+} from '@grafana/ui';
+
 
 interface VariableQueryProps {
   query: MongoDBVariableQuery;
-  onChange: (query: MongoDBVariableQuery, definition: string) => void;
+  onChange: (query: MongoDBVariableQuery) => void;
 }
 
-export const VariableQueryEditor: React.FC<VariableQueryProps> = ({ onChange, query }) => {
-  const [state, setState] = useState(query);
+export class VariableQueryEditor extends PureComponent<VariableQueryProps> {
+  readonly labelWidth = 25;
+  readonly longWidth = 50;
 
-  const saveQuery = () => {
-    onChange(state, `${state.database} (${state.collection})`);
+  onDatabaseChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, database: event.target.value });
   };
 
-  const handleChange = (event: React.FormEvent<HTMLInputElement>) =>
-    setState({
-      ...state,
-      [event.currentTarget.name]: event.currentTarget.value,
-    });
+  onCollectionChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, collection: event.target.value });
+  };
 
-  return (
-    <>
-      <div className="gf-form">
-        <span className="gf-form-label width-10">Database</span>
-        <input
-          name="database"
-          className="gf-form-input"
-          onBlur={saveQuery}
-          onChange={handleChange}
-          value={state.database}
-        />
-      </div>
-      <div className="gf-form">
-        <span className="gf-form-label width-10">Collection</span>
-        <input
-          name="collection"
-          className="gf-form-input"
-          onBlur={saveQuery}
-          onChange={handleChange}
-          value={state.collection}
-        />
-      </div>
+  onFieldNameChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, fieldName: event.target.value });
+  };
 
-      <div className="gf-form">
-        <span className="gf-form-label width-10">Aggregation</span>
-        <input
-          name="aggregation"
-          className="gf-form-input"
-          onBlur={saveQuery}
-          onChange={handleChange}
-          value={state.aggregation}
-        />
-      </div>
-      <div className="gf-form">
-        <span className="gf-form-label width-10">Field Name</span>
-        <input
-          name="fieldName"
-          className="gf-form-input"
-          onBlur={saveQuery}
-          onChange={handleChange}
-          value={state.fieldName}
-        />
-      </div>
-      <div className="gf-form">
-        <span className="gf-form-label width-10">Field Type</span>
-        <input
-          name="fieldType"
-          className="gf-form-input"
-          onBlur={saveQuery}
-          onChange={handleChange}
-          value={state.fieldType}
-        />
-      </div>
+  onFieldTypeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, fieldType: event.target.value });
+  };
 
-    </>
-  );
+  onAggregationChange = (newAggregation: string) => {
+    const { onChange, query } = this.props;
+    onChange({ ...query, aggregation: newAggregation });
+  };
+
+  render() {
+    const query = defaults(this.props.query, defaultVariableQuery);
+
+    return (
+      <>
+        <InlineFieldRow>
+          <InlineField
+              labelWidth={this.labelWidth}
+              label="Database.Collection"
+              >
+            <Input
+              width={this.longWidth}
+              name="database"
+              type="text"
+              placeholder="my_database"
+              onChange={this.onDatabaseChange}
+              value={query.database}
+            ></Input>
+          </InlineField>
+          <InlineField
+              label="."
+              >
+            <Input
+              width={this.longWidth}
+              name="collection"
+              type="text"
+              placeholder="my_collection"
+              onChange={this.onCollectionChange}
+              value={query.collection}
+            ></Input>
+          </InlineField>
+        </InlineFieldRow>
+  
+        <InlineFieldRow>
+           <InlineField
+               label="Field"
+               labelWidth={this.labelWidth}
+               >
+             <Input
+               width={this.longWidth}
+               placeholder="name"
+               onChange={this.onFieldNameChange}
+               value={query.fieldName}
+             ></Input>
+           </InlineField>
+           <InlineField
+              label=":"
+              >
+            <Input
+              width={this.longWidth}
+              placeholder="type"
+              onChange={this.onFieldTypeChange}
+              value={query.fieldType}
+            ></Input>
+          </InlineField>
+        </InlineFieldRow>
+  
+        <InlineFormLabel
+          width={this.labelWidth}
+          tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects. Helper functions like new Date() or ObjectId() are not supported, consult the MongoDB manual at https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/ to see how to represent these functions in pure JSON"
+        >
+          Aggregation
+        </InlineFormLabel>
+        <CodeEditor
+          height="200px"
+          showLineNumbers={true}
+          language="json"
+          onBlur={this.onAggregationChange}
+          value={query.aggregation}
+        ></CodeEditor>
+      </>
+    );
+  }
 };

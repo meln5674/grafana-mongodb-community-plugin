@@ -1,9 +1,13 @@
 import React, { ChangeEvent, PureComponent } from 'react';
-import { LegacyForms } from '@grafana/ui';
+import {
+  FieldSet,
+  InlineField,
+  InlineFieldRow,
+  Input,
+  SecretInput,
+} from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
 import { MongoDBDataSourceOptions, MongoDBSecureJsonData } from './types';
-
-const { SecretFormField, FormField } = LegacyForms;
 
 interface Props extends DataSourcePluginOptionsEditorProps<MongoDBDataSourceOptions> {}
 
@@ -53,50 +57,52 @@ export class ConfigEditor extends PureComponent<Props, State> {
     });
   };
 
+  readonly shortWidth = 15;
+  readonly longWidth = 60;
+
   render() {
     const { options } = this.props;
     const { jsonData, secureJsonFields } = options;
     const secureJsonData = (options.secureJsonData || {}) as MongoDBSecureJsonData;
 
     return (
-      <div className="gf-form-group">
-        <div className="gf-form">
-          <FormField
-            label="URL"
-            labelWidth={6}
-            inputWidth={40}
-            onChange={this.onURLChange}
-            value={jsonData.url || ''}
-            placeholder="mongodb[+svc]://hostname:port[,hostname:port][/?key=value]"
-          />
-        </div>
-
-        <div className="gf-form-inline">
-          <div className="gf-form">
-            <SecretFormField
-              isConfigured={(secureJsonFields && secureJsonFields.username) as boolean}
-              value={secureJsonData.username || ''}
-              label="Username"
-              placeholder="Username"
-              labelWidth={6}
-              inputWidth={20}
-              onReset={this.onResetCredential}
-              onChange={this.onUsernameChange}
-            />
-            <SecretFormField
-              isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
-              value={secureJsonData.password || ''}
-              label="Password"
-              placeholder="Password"
-              labelWidth={6}
-              inputWidth={20}
-              onReset={this.onResetCredential}
-              onChange={this.onPasswordChange}
-            />
-
-          </div>
-        </div>
-      </div>
+      <>
+        <FieldSet label="MongoDB Connection" width={400}>
+          <InlineField labelWidth={this.shortWidth} label="URL">
+            <Input
+              width={this.longWidth}
+              name="url"
+              type="text"
+              onChange={this.onURLChange}
+              value={jsonData.url || ''}
+              placeholder="mongodb[+svc]://hostname:port[,hostname:port][/?key=value]"
+            ></Input>
+          </InlineField>
+          <InlineFieldRow>
+            <InlineField labelWidth={this.shortWidth} label="Username">
+              <SecretInput
+                width={this.shortWidth}
+                isConfigured={(secureJsonFields && secureJsonFields.username) as boolean}
+                value={secureJsonData.username || ''}
+                placeholder="Username"
+                onReset={this.onResetCredential}
+                onChange={this.onUsernameChange}
+              ></SecretInput>
+            </InlineField>
+            <InlineField label="Password" labelWidth={this.shortWidth}>
+              <SecretInput
+                width={this.shortWidth}
+                isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
+                value={secureJsonData.password || ''}
+                label="Password"
+                placeholder="Password"
+                onReset={this.onResetCredential}
+                onChange={this.onPasswordChange}
+              ></SecretInput>
+            </InlineField>
+          </InlineFieldRow>
+        </FieldSet>
+      </>
     );
   }
 }
