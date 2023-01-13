@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -xeu
 
 # Ensure datasets are downloaded
 # Create a KinD cluster with the repo checkout mounted
@@ -12,6 +12,17 @@
     # If in dev mode, restart grafana to ensure any changes take effect, then start port forwarding
     # If not in dev mode, wait for grafana to become health in a reasonable amount of time, then run a Job
     #     that hits the datasource
+
+# Read a file and print it as a JSON string, i.e. with ""'s and \n's    
+function as-json {
+    echo -n '"'
+    while read -r line ; do
+        echo -n "${line//'"'/'\"'}"'\n'
+    done
+    echo -n '"'
+}
+
+if [ -z "${INTEGRATION_TEST_ONLY_TESTS:-}" ]; then
 
 if ! [ -f integration-test/datasets/download/tweets.zip ]; then
     curl -vfL https://github.com/ozlerhakan/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true > integration-test/datasets/download/tweets.zip
@@ -28,7 +39,7 @@ if ! kind get clusters | grep -q "${KIND_CLUSTER_NAME}" ; then
     sed "s/hostPath: .*/hostPath: '${PWD//\//\\/}'/" < integration-test/kind.config.template > integration-test/kind.config
 
     kind create cluster --name "${KIND_CLUSTER_NAME}" --kubeconfig "${KUBECONFIG}" --config integration-test/kind.config
-    if [ -z "${INTEGRATION_TEST_NO_CLEANUP}" ]; then
+    if [ -z "${INTEGRATION_TEST_NO_CLEANUP:-}" ]; then
         trap "kind delete cluster --name '${KIND_CLUSTER_NAME}'" EXIT
     fi
 fi
@@ -46,6 +57,146 @@ $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-te
   transations.sh: |
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasets/transactions.sh; set +x)
 ---
+EOF
+
+helm repo add jetstack https://charts.jetstack.io
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+NGINX_ARGS=(
+    --set fullnameOverride=plugin-repo
+    --set extraVolumes[0].name=plugin
+    --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/
+    --set extraVolumeMounts[0].name=plugin
+    --set extraVolumeMounts[0].mountPath=/opt/bitnami/nginx/html/grafana-mongodb-community-plugin/
+    --set service.type=ClusterIP
+)
+
+helm upgrade --install --wait plugin-repo bitnami/nginx "${NGINX_ARGS[@]}"
+
+CERT_MANAGER_ARGS=(
+    --set installCRDs=true
+)
+
+helm upgrade --install --wait cert-manager jetstack/cert-manager "${CERT_MANAGER_ARGS[@]}"
+
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-tls-ca
+spec:
+  isCA: true
+  commonName: mongodb-tls-ca
+  secretName: mongodb-tls-ca
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: mongodb-tls-ca
+spec:
+  ca:
+    secretName: mongodb-tls-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-mtls-client
+spec:
+  isCA: true
+  commonName: mongodb-mtls-client
+  secretName: mongodb-mtls-client
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: mongodb-tls-ca
+    kind: Issuer
+    group: cert-manager.io
+EOF
+
+kubectl wait certificate/mongodb-tls-ca --for=condition=ready
+kubectl wait certificate/mongodb-mtls-client --for=condition=ready
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-tls-certs
+data:
+    mongodb-ca-cert: $(kubectl get secret mongodb-tls-ca --template '{{ index .data "tls.crt" }}')
+    mongodb-ca-key: $(kubectl get secret mongodb-tls-ca --template '{{ index .data "tls.key" }}')
+EOF
+
+MONGODB_ARGS=(
+    --version 13.6.2
+    --set auth.rootPassword=rootPassword
+    --set initdbScriptsConfigMap=mongodb-init
+    --set useStatefulSet=true
+    --set extraVolumes[0].name=sample-data
+    --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
+    --set extraVolumeMounts[0].name=sample-data
+    --set extraVolumeMounts[0].mountPath=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
+    --set image.debug=true
+)
+
+helm upgrade --install --wait mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
+
+MONGODB_NOAUTH_ARGS+=( "${MONGODB_ARGS[@]}" --set auth.enabled=false )
+
+helm upgrade --install --wait mongodb-no-auth bitnami/mongodb "${MONGODB_NOAUTH_ARGS[@]}"
+
+MONGODB_TLS_CHART_REPO_PATH=integration-test/vendor/github.com/bitnami/charts
+# See https://github.com/bitnami/charts/issues/13317
+if [ -e "${MONGODB_TLS_CHART_REPO_PATH}" ]; then
+    rm -rf "${MONGODB_TLS_CHART_REPO_PATH}"
+fi
+mkdir -p "${MONGODB_TLS_CHART_REPO_PATH}"
+git clone git@github.com:meln5674/bitnami-charts.git "${MONGODB_TLS_CHART_REPO_PATH}"
+git -C "${MONGODB_TLS_CHART_REPO_PATH}" pull --force
+git -C "${MONGODB_TLS_CHART_REPO_PATH}" checkout feature/mongodb-tls-only-13317
+MONGODB_TLS_CHART_PATH="${MONGODB_TLS_CHART_REPO_PATH}/bitnami/mongodb"
+helm dep update "${MONGODB_TLS_CHART_PATH}"
+
+MONGODB_MTLS_ARGS=(
+    "${MONGODB_ARGS[@]}"
+    --set tls.enabled=true
+    --set tls.existingSecret=mongodb-tls-certs
+)
+
+helm upgrade --install --wait mongodb-mtls "${MONGODB_TLS_CHART_PATH}" "${MONGODB_MTLS_ARGS[@]}"
+
+MONGODB_TLS_ARGS=(
+    "${MONGODB_ARGS[@]}"
+    --set tls.enabled=true
+    --set tls.existingSecret=mongodb-tls-certs
+    --set tls.mTLS.enabled=false
+)
+
+
+
+helm upgrade --install --wait mongodb-tls "${MONGODB_TLS_CHART_PATH}" "${MONGODB_TLS_ARGS[@]}"
+
+
+MONGODB_CA=$(kubectl get secret mongodb-tls-certs --template '{{ index .data "mongodb-ca-cert" }}' | base64 -d | as-json)
+MONGODB_CLIENT_CERT=$(kubectl get secret mongodb-mtls-client --template '{{ index .data "tls.crt" }}' | base64 -d | as-json)
+MONGODB_CLIENT_KEY=$(kubectl get secret mongodb-mtls-client --template '{{ index .data "tls.key" }}' | base64 -d | as-json)
+
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -60,7 +211,18 @@ metadata:
   name: datasources
 stringData:
   datasources.yaml: |
-$(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/datasources.yaml; set -x)
+$(
+  set +x
+  cat integration-test/datasources.yaml \
+  | while IFS= read -r line; do
+        echo "    ${line}"
+    done \
+  | sed "s|TLS_CERTIFICATE|${MONGODB_CLIENT_CERT//\\/\\\\}|" \
+  | sed "s|TLS_KEY|${MONGODB_CLIENT_KEY//\\/\\\\}|" \
+  | sed "s|TLS_CA|${MONGODB_CA//\\/\\\\}|" \
+  | tee /dev/stderr
+  set -x
+)
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -79,36 +241,6 @@ data:
 $(set +x; while IFS= read -r line; do echo "    ${line}" ; done < integration-test/dashboards/transactions.json; set -x)
 EOF
 
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
-NGINX_ARGS=(
-    --set fullnameOverride=plugin-repo
-    --set extraVolumes[0].name=plugin
-    --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/
-    --set extraVolumeMounts[0].name=plugin
-    --set extraVolumeMounts[0].mountPath=/opt/bitnami/nginx/html/grafana-mongodb-community-plugin/
-    --set service.type=ClusterIP
-)
-
-helm upgrade --install --wait plugin-repo bitnami/nginx "${NGINX_ARGS[@]}"
-
-MONGODB_ARGS=(
-    --version 12.1.26
-    --set auth.rootPassword=rootPassword
-    --set initdbScriptsConfigMap=mongodb-init
-    --set useStatefulSet=true
-    --set extraVolumes[0].name=sample-data
-    --set extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
-    --set extraVolumeMounts[0].name=sample-data
-    --set extraVolumeMounts[0].mountPath=/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download
-)
-
-helm upgrade --install --wait mongodb bitnami/mongodb "${MONGODB_ARGS[@]}"
-
-MONGODB_ARGS+=( --set auth.enabled=false )
-
-helm upgrade --install --wait mongodb-no-auth bitnami/mongodb "${MONGODB_ARGS[@]}"
 
 GRAFANA_ARGS=(
     --set datasources.secretName=datasources
@@ -123,7 +255,7 @@ GRAFANA_ARGS=(
     # --set image.tag=7.1.5-debian-10-r9
 )
 
-if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
+if [ -n "${INTEGRATION_TEST_DEV_MODE:-}" ]; then
     GRAFANA_ARGS+=(
         --set grafana.extraVolumes[0].name=plugin
         --set grafana.extraVolumes[0].hostPath.path=/mnt/host/grafana-mongodb-community-plugin/
@@ -141,15 +273,20 @@ fi
 helm upgrade --install --wait grafana bitnami/grafana "${GRAFANA_ARGS[@]}"
 
         
-if [ -n "${INTEGRATION_TEST_DEV_MODE}" ]; then
+if [ -n "${INTEGRATION_TEST_DEV_MODE:-}" ]; then
     kubectl rollout restart deploy/grafana
     kubectl rollout status deploy/grafana
     sleep 5
     echo 'Forwarding ports. Press Ctrl+C to exit and re-run this script to make changes'
     kubectl port-forward deploy/grafana 3000:3000
-else
-    kubectl wait deploy/grafana --for=condition=available --timeout=300s
-    kubectl replace --force -f - <<EOF
+    exit 0
+fi
+
+fi
+    
+
+kubectl wait deploy/grafana --for=condition=available --timeout=300s
+kubectl replace --force -f - <<EOF
 
 apiVersion: batch/v1
 kind: Job
@@ -168,6 +305,9 @@ spec:
         - |
             curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/1/health
             curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/2/health
+            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/3/health
+            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/4/health
+            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/5/health
             for query in weather/timeseries weather/timeseries-date weather/table tweets/timeseries; do
                 curl 'http://grafana:3000/api/ds/query' \
                   -v -f \
@@ -187,17 +327,16 @@ spec:
 EOF
 
 
-    kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
-    kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
+kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
+kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
 
-    wait -n
+wait -n
 
-    kill $(jobs -p)
+kill $(jobs -p)
 
-    if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
-        kubectl logs job/grafana-mongodb-community-plugin-it
+if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
+    kubectl logs job/grafana-mongodb-community-plugin-it
 
-        echo
-        exit 1
-    fi
+    echo
+    exit 1
 fi

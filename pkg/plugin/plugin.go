@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -212,7 +214,12 @@ func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error
 }
 
 type jsonData struct {
-	URL string `json:"url"`
+	URL            string `json:"url"`
+	TLS            bool   `json:"tls"`
+	TLSCertificate string `json:"tlsCertificate"`
+	TLSCA          string `json:"tlsCa"`
+	TLSInsecure    bool   `json:"tlsInsecure"`
+	TLSServerName  string `json:"tlsServerName"`
 }
 
 func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Client, err error, internalErr error) {
@@ -231,6 +238,7 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	opts = opts.ApplyURI(mongoURL.String())
 	username, hasUsername := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["username"]
 	password, hasPassword := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["password"]
+	tlsCertificateKey, hasTLSCertificateKey := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["tlsCertificateKey"]
 
 	if hasUsername && username != "" {
 		if hasPassword && password != "" {
@@ -244,6 +252,33 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 			Password: password,
 		}
 		opts = opts.SetAuth(credential)
+	}
+
+	if data.TLS {
+		tlsConfig := &tls.Config{}
+		if data.TLSCA != "" {
+			tlsConfig.RootCAs = x509.NewCertPool()
+			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(data.TLSCA)) {
+				return nil, fmt.Errorf("failed to add tlsCA"), nil
+			}
+		}
+		if data.TLSInsecure {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		if (data.TLSCertificate != "") != hasTLSCertificateKey {
+			return nil, fmt.Errorf("Must provide both tlsCertificate and tlsCertificateKey, or neither"), nil
+		}
+		if data.TLSCertificate != "" && hasTLSCertificateKey {
+			clientCert, err := tls.X509KeyPair([]byte(data.TLSCertificate), []byte(tlsCertificateKey))
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to parse TLS Certificate-Key Pair"), nil
+			}
+			tlsConfig.Certificates = []tls.Certificate{clientCert}
+		}
+		if data.TLSServerName != "" {
+			tlsConfig.ServerName = data.TLSServerName
+		}
+		opts = opts.SetTLSConfig(tlsConfig)
 	}
 
 	mongoClient, err := mongo.Connect(ctx, opts)
