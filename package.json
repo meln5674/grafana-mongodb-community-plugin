@@ -18,14 +18,14 @@
   "author": "Andrew Melnick",
   "license": "AGPL-3.0",
   "dependencies": {
-      "mongodb": "^4.8.0"
+    "mongodb": "^4.8.0"
   },
   "devDependencies": {
     "@grafana/data": "^9.1.0",
-    "@grafana/toolkit": "^9.1.0",
     "@grafana/runtime": "^9.1.0",
+    "@grafana/toolkit": "^9.1.0",
     "@grafana/ui": "^9.1.0",
-    "@types/lodash": "latest"
+    "@types/lodash": "^4.14.191"
   },
   "resolutions": {
     "rxjs": "7.3.0"
