@@ -22,7 +22,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
     const { onOptionsChange, options } = this.props;
     const jsonData = {
       ...options.jsonData,
-      tlsCA: event.target.value,
+      tlsCa: event.target.value,
     };
     onOptionsChange({ ...options, jsonData });
   };
@@ -93,12 +93,8 @@ export class ConfigEditor extends PureComponent<Props, State> {
       secureJsonFields: {
         ...options.secureJsonFields,
         username: false,
-        password: false
-      },
-      secureJsonData: {
-        ...options.secureJsonData,
-        username: '',
-        password: ''
+        password: false,
+        tlsCertificateKey: false,
       },
     });
   };
@@ -195,7 +191,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
               <Field label="TLS Certificate Key">
                 <TextArea
                   value={secureJsonData.tlsCertificateKey || ''}
-                  placeholder={"-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"}
+                  placeholder={secureJsonFields.tlsCertificateKey ? "-----BEGIN RSA PRIVATE KEY-----\n(This field has been set and is hidden)\n-----END RSA PRIVATE KEY-----" : "-----BEGIN RSA PRIVATE KEY-----\n(This field has not been set)\n-----END RSA PRIVATE KEY-----"}
                   onChange={this.onTLSCertificateKeyChange}
                   cols={100}
                 />

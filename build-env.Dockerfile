@@ -54,6 +54,8 @@ COPY --from=kind /usr/local/bin/kind /usr/local/bin/kind
 
 RUN apt-get install -y gcc g++ zip unzip make
 
+RUN npm install -g @grafana/toolkit
+
 RUN node --version \
  && npm --version \
  && yarn --version \
