@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: '**' 
+  pull_request:
+    branches: '**'
+    tags: '**'
+  workflow_dispatch: {}
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Build and Test
+        id: build-and-test
+        run: |
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh bash -xec "$(cat <<'EOF'
+            yarn install
+            yarn build
+            yarn backend
+            yarn plugin
+            yarn integration-test
+          EOF
+          )"
+

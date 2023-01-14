@@ -166,7 +166,7 @@ if [ -e "${MONGODB_TLS_CHART_REPO_PATH}" ]; then
     rm -rf "${MONGODB_TLS_CHART_REPO_PATH}"
 fi
 mkdir -p "${MONGODB_TLS_CHART_REPO_PATH}"
-git clone git@github.com:meln5674/bitnami-charts.git "${MONGODB_TLS_CHART_REPO_PATH}"
+git clone https://github.com/meln5674/bitnami-charts.git "${MONGODB_TLS_CHART_REPO_PATH}"
 git -C "${MONGODB_TLS_CHART_REPO_PATH}" pull --force
 git -C "${MONGODB_TLS_CHART_REPO_PATH}" checkout feature/mongodb-tls-only-13317
 MONGODB_TLS_CHART_PATH="${MONGODB_TLS_CHART_REPO_PATH}/bitnami/mongodb"
