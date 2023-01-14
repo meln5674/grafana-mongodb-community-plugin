@@ -340,3 +340,5 @@ if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=comple
     echo
     exit 1
 fi
+
+echo "Tests passed"

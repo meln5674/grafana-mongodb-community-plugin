@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -200,12 +201,20 @@ func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error
 		}
 		values = append(values, convertedTimestamp)
 	}
-	for _, valueKey := range m.ValueFields {
+	for ix, valueKey := range m.ValueFields {
 		valueValue, ok := doc[valueKey]
+		valueValueValue := reflect.ValueOf(valueValue)
 		if !ok {
 			values = append(values, nil)
 		} else if asTime, isTime := valueValue.(bsonPrim.DateTime); isTime {
 			values = append(values, asTime.Time())
+		} else if m.ValueFieldTypes[ix][0] == '*' && valueValueValue.Kind() != reflect.Pointer {
+			// Adding e.g. a float64 to a frame of *float64 is not handled seamlessly,
+			// we have do it manually
+			// We can't just do valueValueValue.Addr().Interface(), as scalar's aren't addressable for some reason
+			valuePtr := reflect.New(valueValueValue.Type())
+			valuePtr.Elem().Set(valueValueValue)
+			values = append(values, valuePtr.Interface())
 		} else {
 			values = append(values, valueValue)
 		}
