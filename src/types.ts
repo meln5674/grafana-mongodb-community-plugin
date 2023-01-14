@@ -64,6 +64,11 @@ export const defaultVariableQuery: Partial<MongoDBVariableQuery> = {
  */
 export interface MongoDBDataSourceOptions extends DataSourceJsonData {
   url?: string;
+  tls?: boolean;
+  tlsInsecure?: boolean;
+  tlsCertificate?: string;
+  tlsCa?: string;
+  tlsServerName?: string;
 }
 
 /**
@@ -72,4 +77,5 @@ export interface MongoDBDataSourceOptions extends DataSourceJsonData {
 export interface MongoDBSecureJsonData {
     username?: string;
     password?: string;
+    tlsCertificateKey?: string;
 }

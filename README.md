@@ -81,9 +81,9 @@ export INTEGRATION_TEST_DEV_MODE=1
 yarn integration-test
 ```
 
-Grafana credentials: admin/admin
+Grafana credentials: admin/adminPassword
 
-MongoDD credentials: root/root
+MongoDD credentials: root/rootPassword
 
 MongoDB Test datasets:
 

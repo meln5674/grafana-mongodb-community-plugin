@@ -13,4 +13,36 @@ datasources:
   access: proxy
   jsonData:
     url: mongodb://mongodb-no-auth:27017
-
+- name: mongodb-mtls
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb-mtls-0.mongodb-mtls:27017
+    tls: true
+    tlsCertificate: TLS_CERTIFICATE
+    tlsCa: TLS_CA
+    tlsServerName: mongodb-mtls
+  secureJsonData:
+    username: root
+    password: rootPassword
+    tlsCertificateKey: TLS_KEY
+- name: mongodb-tls
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb-tls-0.mongodb-tls.default.svc.cluster.local:27017
+    tls: true
+    tlsCa: TLS_CA
+  secureJsonData:
+    username: root
+    password: rootPassword
+- name: mongodb-tls-insecure
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb-tls-0.mongodb-tls.default.svc.cluster.local:27017
+    tls: true
+    tlsInsecure: true
+  secureJsonData:
+    username: root
+    password: rootPassword
