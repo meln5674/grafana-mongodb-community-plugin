@@ -14,17 +14,54 @@ jobs:
 
       - uses: actions/checkout@v2
 
-      - name: Build and Test
-        id: build-and-test
+      - name: Install Dependencies
+        id: install-dependencies
         run: |
           export GOPATH=~/go
           mkdir -p "${GOPATH}"
           ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn install
+            yarn install && go mod download
+          EOF
+          )"
+
+      - name: Build Frontend
+        id: build-frontend
+        run: |
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh bash -xec "$(cat <<'EOF'
             yarn build
+          EOF
+          )"
+
+      - name: Build Backend
+        id: build-backend
+        run: |
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh bash -xec "$(cat <<'EOF'
             yarn backend
+          EOF
+          )"
+
+      - name: Build Plugin Zip
+        id: build-plugin-zip
+        run: |
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh bash -xec "$(cat <<'EOF'
             yarn plugin
+          EOF
+          )"
+
+      - name: Run Integration Tests
+        id: run-integration-tests
+        run: |
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh bash -xec "$(cat <<'EOF'
             yarn integration-test
           EOF
           )"
+
 
