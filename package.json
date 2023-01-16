@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "description": "Community-supported MongoDB Datasource Plugin",
   "scripts": {
+    "deps": "yarn install && go mod download",
     "build": "grafana-toolkit plugin:build",
     "test": "grafana-toolkit plugin:test",
     "dev": "grafana-toolkit plugin:dev",

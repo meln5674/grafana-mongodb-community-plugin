@@ -1,5 +1,10 @@
 name: CI
 
+env:
+  NO_BUILD_IMAGE: '1'
+  IMAGE_REPO: localhost/meln5674/grafana-mongodb-community-plugin
+  IMAGE_TAG: github-actions
+
 on:
   push:
     branches: '**' 
@@ -12,56 +17,117 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - name: Get go cache directory path
+        id: gopath-dir-path
+        run: echo "::set-output name=dir::$(echo ~/go)"
+
+      - name: Get builder image directory path
+        id: builder-image-dir-path
+        run: echo "::set-output name=dir::$(echo ~/build-env)"
+
+
+      - name: Cache yarn cache
+        uses: actions/cache/restore@v3
+        id: restore-yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn
+          restore-keys: |
+            ${{ runner.os }}-yarn
+
+      - name: Cache gopath
+        uses: actions/cache/restore@v3
+        id: restore-gopath
+        with:
+          path: ${{ steps.gopath-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-go
+          restore-keys: |
+            ${{ runner.os }}-go
+
+      - name: Cache builder image
+        uses: actions/cache/restore@v3
+        id: restore-builder-image
+        with:
+          path: ${{ steps.builder-image-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-builder-image
+          restore-keys: |
+            ${{ runner.os }}-builder-image
+
+      - name: Build Builder Image
+        id: build-builder-image
+        run: |
+          set -x
+          if [ -e ./build-env ]; then
+            docker load < ~/build-env/image.tar
+          fi
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          NO_BUILD_IMAGE='' ./build-env.sh true
+          mkdir -p ~/build-env
+          docker save "${IMAGE_REPO}:${IMAGE_TAG}" > ~/build-env/image.tar
+     
+      - name: Cache builder image
+        uses: actions/cache/save@v3
+        id: cache-builder-image
+        with:
+          path: ${{ steps.builder-image-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-builder-image
+          restore-keys: |
+            ${{ runner.os }}-builder-image
 
       - name: Install Dependencies
         id: install-dependencies
         run: |
           export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn install && go mod download
-          EOF
-          )"
+          ./build-env.sh yarn deps
+
+      - name: Cache yarn cache
+        uses: actions/cache/save@v3
+        id: cache-yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn
+          restore-keys: |
+            ${{ runner.os }}-yarn
+
+      - name: Cache gopath
+        uses: actions/cache/save@v3
+        id: cache-gopath
+        with:
+          path: ${{ steps.gopath-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-go
+          restore-keys: |
+            ${{ runner.os }}-go
+
 
       - name: Build Frontend
         id: build-frontend
         run: |
           export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn build
-          EOF
-          )"
+          ./build-env.sh yarn build
 
       - name: Build Backend
         id: build-backend
         run: |
           export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn backend
-          EOF
-          )"
+          ./build-env.sh yarn backend
 
       - name: Build Plugin Zip
         id: build-plugin-zip
         run: |
           export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn plugin
-          EOF
-          )"
+          ./build-env.sh yarn plugin
 
       - name: Run Integration Tests
         id: run-integration-tests
         run: |
           export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          ./build-env.sh bash -xec "$(cat <<'EOF'
-            yarn integration-test
-          EOF
-          )"
+          ./build-env.sh yarn integration-test
 
 
