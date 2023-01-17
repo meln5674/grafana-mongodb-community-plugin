@@ -1,11 +1,11 @@
 import { defaults } from 'lodash';
 
 import React, { ChangeEvent, PureComponent, SyntheticEvent } from 'react';
-import { LegacyForms, Tooltip, InlineFormLabel, Icon } from '@grafana/ui';
+import { LegacyForms, Tooltip, InlineFormLabel, Icon, Switch } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from './datasource';
 import { defaultQuery, MongoDBDataSourceOptions, MongoDBQuery, MongoDBQueryType } from './types';
-const { FormField, Input, Switch, Select } = LegacyForms;
+const { FormField, Input, Select } = LegacyForms;
 
 
 type Props = QueryEditorProps<DataSource, MongoDBQuery, MongoDBDataSourceOptions>;
@@ -65,6 +65,19 @@ export class QueryEditor extends PureComponent<Props> {
   onLabelFieldsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     onChange({ ...query, labelFields: event.target.value.split(",") });
+    // executes the query
+    onRunQuery();
+  };
+
+  onSchemaInferenceChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, schemaInference: event.target.checked });
+    // executes the query
+    onRunQuery();
+  };
+  onSchemaInferenceDepthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, schemaInferenceDepth: parseInt(event.target.value, 10) });
     // executes the query
     onRunQuery();
   };
@@ -176,24 +189,52 @@ export class QueryEditor extends PureComponent<Props> {
       ) : false }
 
       <div className="gf-form">
-        <FormField
-          labelWidth={this.labelWidth}
-          value={(query.valueFields || []).join(",")}
-          onChange={this.onValueFieldsChange}
-          label="Value Fields"
-          tooltip="Comma separated list of fields containing measurements or other recorded values. Nested fields are not supported, please project to a flat document"
+        <InlineFormLabel
+          width={this.labelWidth}
+          tooltip="If enabled, Grafana will attempt to figure out the types of your data based on the first few documents. Otherwise, you will need to specify the names and datatypes of each field"
+        >
+          Infer Schema
+        </InlineFormLabel>
+        <Switch
+          value={query.schemaInference || false}
+          onChange={this.onSchemaInferenceChange}
         />
       </div>
 
-      <div className="gf-form">
-        <FormField
-          labelWidth={this.labelWidth}
-          value={(query.valueFieldTypes || []).join(",")}
-          onChange={this.onValueFieldTypesChange}
-          label="Value Field Types"
-          tooltip="Comma separated list of the data types (float64, uint64, string, etc) of the values listed in the Value Fields. Prefix with a star if a field may not appear in every document for a given series."
-        />
-      </div>
+      { query.schemaInference ?
+        <>
+          <FormField
+            labelWidth={this.labelWidth}
+            value={`${query.schemaInferenceDepth}`}
+            onChange={this.onSchemaInferenceDepthChange}
+            label="Schema Inference Depth"
+            type="number"
+            tooltip="How many documents to consider for inference before assuming no new fields will be present. If all documents have the same fields, you can set this to 1"
+          />
+        </>
+        :
+        <>
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={(query.valueFields || []).join(",")}
+              onChange={this.onValueFieldsChange}
+              label="Value Fields"
+              tooltip="Comma separated list of fields containing measurements or other recorded values. Nested fields are not supported, please project to a flat document"
+            />
+          </div>
+
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={(query.valueFieldTypes || []).join(",")}
+              onChange={this.onValueFieldTypesChange}
+              label="Value Field Types"
+              tooltip="Comma separated list of the data types (float64, uint64, string, etc) of the values listed in the Value Fields. Prefix with a star if a field may not appear in every document for a given series."
+            />
+          </div>
+        </>
+      }
 
       <div className="gf-form">
         <InlineFormLabel

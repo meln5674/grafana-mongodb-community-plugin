@@ -286,7 +286,7 @@ fi
     
 
 kubectl wait deploy/grafana --for=condition=available --timeout=300s
-kubectl replace --force -f - <<EOF
+kubectl replace --force -f - <<'EOF'
 
 apiVersion: batch/v1
 kind: Job
@@ -299,22 +299,40 @@ spec:
       restartPolicy: Never
       containers:
       - name: curl
-        image: docker.io/alpine/curl:latest
-        command: [sh, -exuc]
+        image: docker.io/library/centos:7 #docker.io/alpine/curl:latest
+        command: [bash, -exuc]
         args:
         - |
-            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/1/health
-            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/2/health
-            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/3/health
-            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/4/health
-            curl -v -f -u admin:adminPassword http://grafana:3000/api/datasources/5/health
-            for query in weather/timeseries weather/timeseries-date weather/table tweets/timeseries; do
-                curl 'http://grafana:3000/api/ds/query' \
-                  -v -f \
-                  -u admin:adminPassword \
-                  -H 'accept: application/json, text/plain, */*' \
-                  -H 'content-type: application/json' \
-                  --data-raw "\$(cat /mnt/host/grafana-mongodb-community-plugin/integration-test//queries/\${query}.json)"
+            DATASOURCES=( $(seq 5) )
+            for datasource in "${DATASOURCES[@]}"; do
+                CMD=(
+                    curl "http://grafana:3000/api/datasources/${datasource}/health"
+                        -v
+                        -u admin:adminPassword 
+                )
+                if ! "${CMD[@]}" --fail ; then
+                    "${CMD[@]}"
+                    exit 1
+                fi
+            done
+            QUERY_DIR=/mnt/host/grafana-mongodb-community-plugin/integration-test/queries
+            QUERIES=( weather/timeseries weather/timeseries-date weather/table tweets/timeseries )
+            for query in "${QUERIES[@]}"; do
+                QUERY_FILE="${QUERY_DIR}/${query}.json"
+                CMD=(
+                    curl 'http://grafana:3000/api/ds/query'
+                      -v
+                      --trace-ascii -
+                      -u admin:adminPassword
+                      -H 'accept: application/json, text/plain, */*'
+                      -H 'content-type: application/json'
+                      --data "@${QUERY_FILE}"
+                )
+
+                if ! "${CMD[@]}" --fail ; then
+                    "${CMD[@]}"
+                    exit 1
+                fi
             done
         volumeMounts:
         - name: datasets

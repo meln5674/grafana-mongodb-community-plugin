@@ -46,7 +46,9 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
         valueFieldTypes: [ query.fieldType ],
         aggregation: query.aggregation,
         autoTimeBound: false,
-        autoTimeSort: false
+        autoTimeSort: false,
+        schemaInference: false,
+        schemaInferenceDepth: 0,
     }
 
     let dataQuery = {

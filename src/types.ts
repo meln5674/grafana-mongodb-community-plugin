@@ -11,6 +11,8 @@ export interface MongoDBQuery extends DataQuery {
   aggregation: string;
   autoTimeBound: boolean;
   autoTimeSort: boolean;
+  schemaInference: boolean;
+  schemaInferenceDepth: number;
 }
 
 export enum MongoDBQueryType {
@@ -38,7 +40,9 @@ export const defaultQuery: Partial<MongoDBQuery> = {
         }
     ]),
     autoTimeBound: false,
-    autoTimeSort: false
+    autoTimeSort: false,
+    schemaInference: false,
+    schemaInferenceDepth: 20,
 };
 
 export interface MongoDBVariableQuery {
