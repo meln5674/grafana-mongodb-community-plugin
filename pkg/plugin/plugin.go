@@ -120,6 +120,7 @@ func (m *queryModel) resolve(fields []field) (resolvedQueryModel, error) {
 			fields:               fields,
 			timestampFieldName:   m.TimestampField,
 			timestampFieldFormat: m.TimestampFormat,
+			labelFieldNames:      m.LabelFields,
 		}, nil
 	default:
 		return nil, fmt.Errorf("Query type must be one of: %s, %s", queryTypeTable, queryTypeTimeseries)
@@ -222,7 +223,7 @@ func convertValue(value interface{}, nullable bool) (interface{}, data.FieldType
 }
 
 type resolvedQueryModel interface {
-	makeFrame(id string) *data.Frame
+	makeFrame(id string, labels data.Labels) *data.Frame
 	getLabels(doc timestepDocument) (labels data.Labels, labelsID string)
 	getValues(doc timestepDocument) ([]interface{}, error)
 }
@@ -231,7 +232,7 @@ type tableQueryModel struct {
 	fields []field
 }
 
-func (m *tableQueryModel) makeFrame(id string) *data.Frame {
+func (m *tableQueryModel) makeFrame(id string, labels data.Labels) *data.Frame {
 	names := make([]string, len(m.fields))
 	types := make([]data.FieldType, len(m.fields))
 
@@ -241,6 +242,9 @@ func (m *tableQueryModel) makeFrame(id string) *data.Frame {
 	}
 	frame := data.NewFrameOfFieldTypes(id, 0, types...)
 	frame.SetFieldNames(names...)
+	for _, field := range frame.Fields {
+		field.Labels = labels
+	}
 
 	return frame
 }
@@ -282,7 +286,7 @@ type timeseriesQueryModel struct {
 
 var _ = resolvedQueryModel(&timeseriesQueryModel{})
 
-func (m *timeseriesQueryModel) makeFrame(id string) *data.Frame {
+func (m *timeseriesQueryModel) makeFrame(id string, labels data.Labels) *data.Frame {
 	names := make([]string, 1+len(m.fields))
 	types := make([]data.FieldType, 1+len(m.fields))
 	names[0] = m.timestampFieldName
@@ -545,19 +549,6 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	return mongoClient, nil, nil
 }
 
-func (m *queryModel) getLabelsID(labels data.Labels) string {
-	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
-	// labelsID := fmt.Sprintf("%#v", map[string]string(labels))
-	if len(m.LabelFields) == 0 {
-		return ""
-	}
-	labelsID := fmt.Sprintf("%s=%s", m.LabelFields[0], labels[m.LabelFields[0]])
-	for _, label := range m.LabelFields[1:] {
-		labelsID += fmt.Sprintf(",%s=%s", label, labels[label])
-	}
-	return labelsID
-}
-
 type resultParser struct {
 	frames map[string]*data.Frame
 	model  resolvedQueryModel
@@ -581,7 +572,7 @@ func (p *resultParser) parseQueryResultDocument(doc timestepDocument) (err error
 	frame, ok := p.frames[labelsID]
 	if !ok {
 		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
-		frame = p.model.makeFrame(labelsID)
+		frame = p.model.makeFrame(labelsID, labels)
 		p.frames[labelsID] = frame
 	}
 	row, err := p.model.getValues(doc)
@@ -659,6 +650,8 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		response.Error = errors.Wrap(err, "Invalid query JSON")
 		return response
 	}
+
+	log.DefaultLogger.Info("Query Model Parsed", "queryModel", qm)
 
 	pipeline, err := qm.getPipeline(query.TimeRange.From, query.TimeRange.To)
 	if err != nil {
