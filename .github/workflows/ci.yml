@@ -27,11 +27,6 @@ jobs:
         id: gopath-dir-path
         run: echo "::set-output name=dir::$(echo ~/go)"
 
-      - name: Get builder image directory path
-        id: builder-image-dir-path
-        run: echo "::set-output name=dir::$(echo ~/build-env)"
-
-
       - name: Cache yarn cache
         uses: actions/cache/restore@v3
         id: restore-yarn-cache
@@ -53,28 +48,6 @@ jobs:
       - name: Cache builder image
         uses: actions/cache/restore@v3
         id: restore-builder-image
-        with:
-          path: ${{ steps.builder-image-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-builder-image
-          restore-keys: |
-            ${{ runner.os }}-builder-image
-
-      - name: Build Builder Image
-        id: build-builder-image
-        run: |
-          set -x
-          if [ -e ~/build-env ]; then
-            docker load < ~/build-env/image.tar
-          fi
-          export GOPATH=~/go
-          mkdir -p "${GOPATH}"
-          NO_BUILD_IMAGE='' ./build-env.sh true
-          mkdir -p ~/build-env
-          docker save "${IMAGE_REPO}:${IMAGE_TAG}" > ~/build-env/image.tar
-     
-      - name: Cache builder image
-        uses: actions/cache/save@v3
-        id: cache-builder-image
         with:
           path: ${{ steps.builder-image-dir-path.outputs.dir }}
           key: ${{ runner.os }}-builder-image
