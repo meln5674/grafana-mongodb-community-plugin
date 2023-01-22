@@ -6,6 +6,7 @@ export interface MongoDBQuery extends DataQuery {
   timestampField: string;
   timestampFormat: string;
   labelFields: string[];
+  legendFormat: string;
   valueFields: string[];
   valueFieldTypes: string[];
   aggregation: string;
@@ -27,6 +28,7 @@ export const defaultQuery: Partial<MongoDBQuery> = {
     timestampField: "timestamp",
     timestampFormat: "",
     labelFields: [ "sensorID" ],
+    legendFormat: "",
     valueFields: [ "measurement" ],
     valueFieldTypes: [ "float64" ],
     aggregation: JSON.stringify([

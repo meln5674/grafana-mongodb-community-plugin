@@ -12,8 +12,10 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
+	sprig "github.com/go-task/slim-sprig"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -96,6 +98,7 @@ type queryModel struct {
 	TimestampField       string    `json:"timestampField"`
 	TimestampFormat      string    `json:"timestampFormat"`
 	LabelFields          []string  `json:"labelFields"`
+	LegendFormat         string    `json:"legendFormat"`
 	ValueFields          []string  `json:"valueFields"`
 	ValueFieldTypes      []string  `json:"valueFieldTypes"`
 	AutoTimeBound        bool      `json:"autoTimeBound"`
@@ -106,6 +109,8 @@ type queryModel struct {
 }
 
 func (m *queryModel) resolve(fields []field) (resolvedQueryModel, error) {
+	var err error
+
 	queryType := m.QueryType
 	if queryType == "" {
 		queryType = defaultQueryType
@@ -116,11 +121,19 @@ func (m *queryModel) resolve(fields []field) (resolvedQueryModel, error) {
 			fields: fields,
 		}, nil
 	case queryTypeTimeseries:
+		var legendTemplate *template.Template
+		if m.LegendFormat != "" {
+			legendTemplate, err = template.New("legend").Funcs(sprig.TxtFuncMap()).Parse(m.LegendFormat)
+			if err != nil {
+				return nil, err
+			}
+		}
 		return &timeseriesQueryModel{
 			fields:               fields,
 			timestampFieldName:   m.TimestampField,
 			timestampFieldFormat: m.TimestampFormat,
 			labelFieldNames:      m.LabelFields,
+			legendTemplate:       legendTemplate,
 		}, nil
 	default:
 		return nil, fmt.Errorf("Query type must be one of: %s, %s", queryTypeTable, queryTypeTimeseries)
@@ -223,7 +236,7 @@ func convertValue(value interface{}, nullable bool) (interface{}, data.FieldType
 }
 
 type resolvedQueryModel interface {
-	makeFrame(id string, labels data.Labels) *data.Frame
+	makeFrame(id string, labels data.Labels) (*data.Frame, error)
 	getLabels(doc timestepDocument) (labels data.Labels, labelsID string)
 	getValues(doc timestepDocument) ([]interface{}, error)
 }
@@ -232,7 +245,7 @@ type tableQueryModel struct {
 	fields []field
 }
 
-func (m *tableQueryModel) makeFrame(id string, labels data.Labels) *data.Frame {
+func (m *tableQueryModel) makeFrame(id string, labels data.Labels) (*data.Frame, error) {
 	names := make([]string, len(m.fields))
 	types := make([]data.FieldType, len(m.fields))
 
@@ -242,11 +255,8 @@ func (m *tableQueryModel) makeFrame(id string, labels data.Labels) *data.Frame {
 	}
 	frame := data.NewFrameOfFieldTypes(id, 0, types...)
 	frame.SetFieldNames(names...)
-	for _, field := range frame.Fields {
-		field.Labels = labels
-	}
 
-	return frame
+	return frame, nil
 }
 
 func (m *tableQueryModel) getLabels(doc timestepDocument) (data.Labels, string) {
@@ -281,12 +291,13 @@ type timeseriesQueryModel struct {
 	timestampFieldName   string
 	timestampFieldFormat string
 	labelFieldNames      []string
+	legendTemplate       *template.Template
 	fields               []field
 }
 
 var _ = resolvedQueryModel(&timeseriesQueryModel{})
 
-func (m *timeseriesQueryModel) makeFrame(id string, labels data.Labels) *data.Frame {
+func (m *timeseriesQueryModel) makeFrame(id string, labels data.Labels) (*data.Frame, error) {
 	names := make([]string, 1+len(m.fields))
 	types := make([]data.FieldType, 1+len(m.fields))
 	names[0] = m.timestampFieldName
@@ -299,8 +310,21 @@ func (m *timeseriesQueryModel) makeFrame(id string, labels data.Labels) *data.Fr
 	}
 	frame := data.NewFrameOfFieldTypes(id, 0, types...)
 	frame.SetFieldNames(names...)
+	for _, field := range frame.Fields {
+		field.Labels = labels
+		displayName, err := m.getDisplayName(field.Name, field.Labels)
+		if err != nil {
+			return nil, err
+		}
+		if displayName == "" {
+			continue
+		}
+		field.Config = &data.FieldConfig{
+			DisplayNameFromDS: displayName,
+		}
+	}
 
-	return frame
+	return frame, nil
 }
 
 func (m *timeseriesQueryModel) getLabels(doc timestepDocument) (data.Labels, string) {
@@ -326,6 +350,22 @@ func (m *timeseriesQueryModel) getLabels(doc timestepDocument) (data.Labels, str
 	}
 
 	return labels, labelsID.String()
+}
+
+func (m *timeseriesQueryModel) getDisplayName(valueField string, labels data.Labels) (string, error) {
+	if m.legendTemplate == nil {
+		return "", nil
+	}
+
+	builder := strings.Builder{}
+	err := m.legendTemplate.Execute(&builder, map[string]interface{}{
+		"Value":  valueField,
+		"Labels": labels,
+	})
+	if err != nil {
+		return "", err
+	}
+	return builder.String(), nil
 }
 
 func (m *timeseriesQueryModel) convertTimestamp(timestamp interface{}) (time.Time, error) {
@@ -572,7 +612,10 @@ func (p *resultParser) parseQueryResultDocument(doc timestepDocument) (err error
 	frame, ok := p.frames[labelsID]
 	if !ok {
 		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
-		frame = p.model.makeFrame(labelsID, labels)
+		frame, err = p.model.makeFrame(labelsID, labels)
+		if err != nil {
+			return err
+		}
 		p.frames[labelsID] = frame
 	}
 	row, err := p.model.getValues(doc)
@@ -651,7 +694,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	log.DefaultLogger.Info("Query Model Parsed", "queryModel", qm)
+	log.DefaultLogger.Debug("Query Model Parsed", "queryModel", qm)
 
 	pipeline, err := qm.getPipeline(query.TimeRange.From, query.TimeRange.To)
 	if err != nil {
@@ -715,7 +758,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 			return response
 		}
 		fields = state.finish()
-		log.DefaultLogger.Info(
+		log.DefaultLogger.Debug(
 			"Inferred schema",
 			"requestedDocs", qm.SchemaInferenceDepth,
 			"bufferedDocs", len(buffering.buffer),
@@ -736,7 +779,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	log.DefaultLogger.Info(
+	log.DefaultLogger.Debug(
 		"Resolved query model",
 		"model", resolvedModel,
 	)
@@ -774,7 +817,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		response.Frames = append(response.Frames, frame)
 	}
 
-	log.DefaultLogger.Info("query finished", "context", pCtx, "query", query, "response", response)
+	log.DefaultLogger.Debug("query finished", "context", pCtx, "query", query, "response", response)
 	return response
 }
 

@@ -69,6 +69,13 @@ export class QueryEditor extends PureComponent<Props> {
     onRunQuery();
   };
 
+  onLegendFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, legendFormat: event.target.value });
+    // executes the query
+    onRunQuery();
+  };
+
   onSchemaInferenceChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     onChange({ ...query, schemaInference: event.target.checked });
@@ -183,6 +190,15 @@ export class QueryEditor extends PureComponent<Props> {
               onChange={this.onLabelFieldsChange}
               label="Label Fields"
               tooltip="Comma separated list of fields containg labels to distinguish different series. Nested fields are not supported, please project to a flat document"
+            />
+          </div>
+          <div className="gf-form">
+            <FormField
+              labelWidth={this.labelWidth}
+              value={query.legendFormat || ""}
+              onChange={this.onLegendFormatChange}
+              label="Legend Format"
+              tooltip="Series name override. Replacements are:\n{{.Value}}: Value field name.\n{{.Labels.field_name}}: Value of the label with name 'field_name'\n{{.Labels}}: key=value,... for all labels\nSee https://pkg.go.dev/text/template for full syntax.\nFunctions from https://masterminds.github.io/sprig/ are provided"
             />
           </div>
         </div>
