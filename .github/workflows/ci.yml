@@ -63,7 +63,7 @@ jobs:
         id: build-builder-image
         run: |
           set -x
-          if [ -e ./build-env ]; then
+          if [ -e ~/build-env ]; then
             docker load < ~/build-env/image.tar
           fi
           export GOPATH=~/go

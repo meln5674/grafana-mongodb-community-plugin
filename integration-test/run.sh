@@ -322,7 +322,6 @@ spec:
                 CMD=(
                     curl 'http://grafana:3000/api/ds/query'
                       -v
-                      --trace-ascii -
                       -u admin:adminPassword
                       -H 'accept: application/json, text/plain, */*'
                       -H 'content-type: application/json'
@@ -345,18 +344,28 @@ spec:
 EOF
 
 
-kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete &
-kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed &
+(
+    kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=-1s &
+    ( kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=failed --timeout=-1s && exit 1 ) &
 
-wait -n
+    wait -n
+) &
+WAIT_PID=$!
 
-kill $(jobs -p)
+(
+    while ! kubectl get pods -ljob-name=grafana-mongodb-community-plugin-it | grep -E 'Running|Completed|Error' ; do
+        sleep 1;
+    done
+    kubectl logs job/grafana-mongodb-community-plugin-it -f 
+) &
+LOGS_PID=$!
 
-if ! kubectl wait job/grafana-mongodb-community-plugin-it --for=condition=complete --timeout=0; then
-    kubectl logs job/grafana-mongodb-community-plugin-it
-
-    echo
+if ! wait "${WAIT_PID}"; then
+    echo 'Tests failed'
+    kill $(jobs -p -r)
     exit 1
 fi
+
+kill $(jobs -p -r) || true
 
 echo "Tests passed"
