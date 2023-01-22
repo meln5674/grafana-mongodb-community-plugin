@@ -2,7 +2,7 @@ name: CI
 
 env:
   NO_BUILD_IMAGE: '1'
-  IMAGE_REPO: localhost/meln5674/grafana-mongodb-community-plugin
+  IMAGE_REPO: ghcr.io/meln5674/grafana-mongodb-community-plugin
   IMAGE_TAG: github-actions
 
 on:
@@ -13,7 +13,7 @@ on:
     tags: '**'
   workflow_dispatch: {}
 jobs:
-  integration-test:
+  ci:
     runs-on: ubuntu-latest
     steps:
 
@@ -44,15 +44,6 @@ jobs:
           key: ${{ runner.os }}-go
           restore-keys: |
             ${{ runner.os }}-go
-
-      - name: Cache builder image
-        uses: actions/cache/restore@v3
-        id: restore-builder-image
-        with:
-          path: ${{ steps.builder-image-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-builder-image
-          restore-keys: |
-            ${{ runner.os }}-builder-image
 
       - name: Install Dependencies
         id: install-dependencies
@@ -103,4 +94,13 @@ jobs:
           export GOPATH=~/go
           ./build-env.sh yarn integration-test
 
-
+      - name: Create Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        if: contains(github.ref, 'tags/v')
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ github.ref }}"
+          prerelease: true
+          title: "${{ github.ref }}"
+          files: |
+            meln5674-mongodb-community.zip
