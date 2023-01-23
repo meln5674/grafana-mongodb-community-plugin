@@ -1,0 +1,35 @@
+name: Builder Image
+
+env:
+  IMAGE_REPO: ghcr.io/meln5674/grafana-mongodb-community-plugin
+  IMAGE_TAG: github-actions
+
+on:
+  workflow_dispatch: {}
+jobs:
+  build-builder-image:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Login to Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Builder Image
+        id: build-builder-image
+        run: |
+          set -x
+          if [ -e ~/build-env ]; then
+            docker load < ~/build-env/image.tar
+          fi
+          export GOPATH=~/go
+          mkdir -p "${GOPATH}"
+          ./build-env.sh true
+          mkdir -p ~/build-env
+          docker push "${IMAGE_REPO}:${IMAGE_TAG}"
+

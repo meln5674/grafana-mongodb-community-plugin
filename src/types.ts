@@ -6,11 +6,14 @@ export interface MongoDBQuery extends DataQuery {
   timestampField: string;
   timestampFormat: string;
   labelFields: string[];
+  legendFormat: string;
   valueFields: string[];
   valueFieldTypes: string[];
   aggregation: string;
   autoTimeBound: boolean;
   autoTimeSort: boolean;
+  schemaInference: boolean;
+  schemaInferenceDepth: number;
 }
 
 export enum MongoDBQueryType {
@@ -25,6 +28,7 @@ export const defaultQuery: Partial<MongoDBQuery> = {
     timestampField: "timestamp",
     timestampFormat: "",
     labelFields: [ "sensorID" ],
+    legendFormat: "",
     valueFields: [ "measurement" ],
     valueFieldTypes: [ "float64" ],
     aggregation: JSON.stringify([
@@ -38,7 +42,9 @@ export const defaultQuery: Partial<MongoDBQuery> = {
         }
     ]),
     autoTimeBound: false,
-    autoTimeSort: false
+    autoTimeSort: false,
+    schemaInference: false,
+    schemaInferenceDepth: 20,
 };
 
 export interface MongoDBVariableQuery {

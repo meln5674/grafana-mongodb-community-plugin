@@ -31,3 +31,5 @@ e2e-results/
 
 *.swp
 *.zip
+
+integration-test/vendor

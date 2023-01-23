@@ -4,11 +4,18 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
+	"runtime"
+	"strconv"
+	"strings"
+	"text/template"
 	"time"
 
+	sprig "github.com/go-task/slim-sprig"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -81,20 +88,336 @@ type queryType = string
 const (
 	queryTypeTimeseries = "Timeseries"
 	queryTypeTable      = "Table"
+	defaultQueryType    = queryTypeTable
 )
 
 type queryModel struct {
-	Database        string    `json:"database"`
-	Collection      string    `json:"collection"`
-	QueryType       queryType `json:"queryType"`
-	TimestampField  string    `json:"timestampField"`
-	TimestampFormat string    `json:"timestampFormat"`
-	LabelFields     []string  `json:"labelFields"`
-	ValueFields     []string  `json:"valueFields"`
-	ValueFieldTypes []string  `json:"valueFieldTypes"`
-	AutoTimeBound   bool      `json:"autoTimeBound"`
-	AutoTimeSort    bool      `json:"autoTimeSort"`
-	Aggregation     string    `json:"aggregation"`
+	Database             string    `json:"database"`
+	Collection           string    `json:"collection"`
+	QueryType            queryType `json:"queryType"`
+	TimestampField       string    `json:"timestampField"`
+	TimestampFormat      string    `json:"timestampFormat"`
+	LabelFields          []string  `json:"labelFields"`
+	LegendFormat         string    `json:"legendFormat"`
+	ValueFields          []string  `json:"valueFields"`
+	ValueFieldTypes      []string  `json:"valueFieldTypes"`
+	AutoTimeBound        bool      `json:"autoTimeBound"`
+	AutoTimeSort         bool      `json:"autoTimeSort"`
+	Aggregation          string    `json:"aggregation"`
+	SchemaInference      bool      `json:"schemaInference"`
+	SchemaInferenceDepth int       `json:"schemaInferenceDepth"`
+}
+
+func (m *queryModel) resolve(fields []field) (resolvedQueryModel, error) {
+	var err error
+
+	queryType := m.QueryType
+	if queryType == "" {
+		queryType = defaultQueryType
+	}
+	switch queryType {
+	case queryTypeTable:
+		return &tableQueryModel{
+			fields: fields,
+		}, nil
+	case queryTypeTimeseries:
+		var legendTemplate *template.Template
+		if m.LegendFormat != "" {
+			legendTemplate, err = template.New("legend").Funcs(sprig.TxtFuncMap()).Parse(m.LegendFormat)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &timeseriesQueryModel{
+			fields:               fields,
+			timestampFieldName:   m.TimestampField,
+			timestampFieldFormat: m.TimestampFormat,
+			labelFieldNames:      m.LabelFields,
+			legendTemplate:       legendTemplate,
+		}, nil
+	default:
+		return nil, fmt.Errorf("Query type must be one of: %s, %s", queryTypeTable, queryTypeTimeseries)
+	}
+}
+
+type field struct {
+	Name string
+	Type data.FieldType
+}
+
+func (f *field) get(doc timestepDocument) interface{} {
+	return doc[f.Name]
+}
+
+func toGrafanaValue(value interface{}) (interface{}, data.FieldType, error) {
+	// Only handles types explicitly referenced as being returned from bson.Unmarshal
+	// https://pkg.go.dev/go.mongodb.org/mongo-driver@v1.11.1/bson#hdr-Native_Go_Types
+	// notably, this does not deal with pointer types, like *float64
+
+	// 19
+	if value == nil {
+		return nil, data.FieldTypeUnknown, nil
+	}
+	switch v := value.(type) {
+	// 1-5
+	case int32, int64, float64, string, bool:
+		return value, data.FieldTypeFor(value), nil
+	// 6-7
+	case bsonPrim.A, bsonPrim.D, bsonPrim.M, map[string]interface{}, []interface{}:
+		// map[string]interface{} and []interface{} aren't documented,
+		// but can be observed to be returned
+		bytes, err := bson.MarshalExtJSON(value, false, false)
+		if err != nil {
+			return nil, data.FieldTypeUnknown, err
+		}
+		return json.RawMessage(bytes), data.FieldTypeJSON, err
+	// 8
+	case bsonPrim.ObjectID:
+		bytes := [12]byte(v)
+		return hex.EncodeToString(bytes[:]), data.FieldTypeString, nil
+	// 9
+	case bsonPrim.DateTime:
+		return v.Time(), data.FieldTypeTime, nil
+	// 10
+	case bsonPrim.Binary:
+		return hex.EncodeToString(v.Data), data.FieldTypeString, nil
+	// 11
+	case bsonPrim.Regex:
+		return fmt.Sprintf("%s", v.Pattern), data.FieldTypeString, nil
+	// 12
+	case bsonPrim.JavaScript:
+		return string(v), data.FieldTypeString, nil
+	// 13
+	case bsonPrim.CodeWithScope:
+		return string(v.Code), data.FieldTypeString, nil
+	// 14
+	case bsonPrim.Timestamp:
+		return time.Unix(int64(v.T), 0), data.FieldTypeTime, nil
+	// 15
+	case bsonPrim.Decimal128:
+		f, err := strconv.ParseFloat(v.String(), 64)
+		return f, data.FieldTypeFloat64, err
+	// 16-17
+	case bsonPrim.MinKey, bsonPrim.MaxKey:
+		return fmt.Sprintf("%#v", v), data.FieldTypeString, nil
+	// 18
+	case bsonPrim.Undefined:
+		return nil, data.FieldTypeUnknown, nil
+	// 19: See above
+	// 20
+	case bsonPrim.DBPointer:
+		return fmt.Sprintf("%#v", v), data.FieldTypeString, nil
+	// 21
+	case bsonPrim.Symbol:
+		return string(v), data.FieldTypeString, nil
+	}
+	return nil, data.FieldTypeUnknown, fmt.Errorf("Got value with a type not expected to be generated by BSON: %#v (%s)", value, reflect.ValueOf(value).Type())
+}
+
+func convertValue(value interface{}, nullable bool) (interface{}, data.FieldType, error) {
+	converted, type_, err := toGrafanaValue(value)
+	if err != nil {
+		return nil, type_, err
+	}
+	if converted == nil {
+		return nil, type_, nil
+	}
+	if !nullable {
+		return converted, type_, nil
+	}
+
+	// Adding e.g. a float64 to a frame of *float64 is not handled seamlessly,
+	// we have do it manually
+	// We can't just do valueValueValue.Addr().Interface(), as scalar's aren't addressable
+	convertedValue := reflect.ValueOf(converted)
+	convertedPtr := reflect.New(convertedValue.Type())
+	convertedPtr.Elem().Set(convertedValue)
+	return convertedPtr.Interface(), type_.NullableType(), nil
+}
+
+type resolvedQueryModel interface {
+	makeFrame(id string, labels data.Labels) (*data.Frame, error)
+	getLabels(doc timestepDocument) (labels data.Labels, labelsID string)
+	getValues(doc timestepDocument) ([]interface{}, error)
+}
+
+type tableQueryModel struct {
+	fields []field
+}
+
+func (m *tableQueryModel) makeFrame(id string, labels data.Labels) (*data.Frame, error) {
+	names := make([]string, len(m.fields))
+	types := make([]data.FieldType, len(m.fields))
+
+	for ix, field := range m.fields {
+		names[ix] = field.Name
+		types[ix] = field.Type
+	}
+	frame := data.NewFrameOfFieldTypes(id, 0, types...)
+	frame.SetFieldNames(names...)
+
+	return frame, nil
+}
+
+func (m *tableQueryModel) getLabels(doc timestepDocument) (data.Labels, string) {
+	return make(data.Labels), ""
+}
+
+func (m *tableQueryModel) getValues(doc timestepDocument) ([]interface{}, error) {
+	var err error
+	var actualType data.FieldType
+	values := make([]interface{}, len(m.fields))
+	for ix, field := range m.fields {
+		name := field.Name
+		type_ := field.Type
+		value := doc[name]
+		values[ix], actualType, err = convertValue(value, type_.Nullable())
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("Failed to convert value for %s", name))
+		}
+		if values[ix] == nil && !type_.Nullable() {
+			return nil, fmt.Errorf("Field %s was null or absent, but is not nullable. If using schema inference, please increase the depth to the first document missing this field, or manually specify the schema", name)
+		}
+		if values[ix] != nil && actualType != type_ {
+			return nil, fmt.Errorf("Type mismatch for field %s: expected %s, got %s", name, type_, actualType)
+		}
+	}
+	return values, nil
+}
+
+var _ = resolvedQueryModel(&tableQueryModel{})
+
+type timeseriesQueryModel struct {
+	timestampFieldName   string
+	timestampFieldFormat string
+	labelFieldNames      []string
+	legendTemplate       *template.Template
+	fields               []field
+}
+
+var _ = resolvedQueryModel(&timeseriesQueryModel{})
+
+func (m *timeseriesQueryModel) makeFrame(id string, labels data.Labels) (*data.Frame, error) {
+	names := make([]string, 1+len(m.fields))
+	types := make([]data.FieldType, 1+len(m.fields))
+	names[0] = m.timestampFieldName
+	types[0] = data.FieldTypeTime
+	valueNames := names[1:]
+	valueTypes := types[1:]
+	for ix, field := range m.fields {
+		valueNames[ix] = field.Name
+		valueTypes[ix] = field.Type
+	}
+	frame := data.NewFrameOfFieldTypes(id, 0, types...)
+	frame.SetFieldNames(names...)
+	for _, field := range frame.Fields {
+		field.Labels = labels
+		displayName, err := m.getDisplayName(field.Name, field.Labels)
+		if err != nil {
+			return nil, err
+		}
+		if displayName == "" {
+			continue
+		}
+		field.Config = &data.FieldConfig{
+			DisplayNameFromDS: displayName,
+		}
+	}
+
+	return frame, nil
+}
+
+func (m *timeseriesQueryModel) getLabels(doc timestepDocument) (data.Labels, string) {
+	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
+	// labelsID := fmt.Sprintf("%#v", map[string]string(labels))
+
+	labels := make(data.Labels, len(m.labelFieldNames))
+
+	labelsID := strings.Builder{}
+
+	for ix, key := range m.labelFieldNames {
+		value, ok := doc[key]
+		if !ok {
+			continue
+		}
+		labels[key] = fmt.Sprintf("%v", value)
+
+		if ix != 0 {
+			labelsID.WriteString(",")
+		}
+		labelsID.WriteString(fmt.Sprintf("%s=%v", key, value))
+
+	}
+
+	return labels, labelsID.String()
+}
+
+func (m *timeseriesQueryModel) getDisplayName(valueField string, labels data.Labels) (string, error) {
+	if m.legendTemplate == nil {
+		return "", nil
+	}
+
+	builder := strings.Builder{}
+	err := m.legendTemplate.Execute(&builder, map[string]interface{}{
+		"Value":  valueField,
+		"Labels": labels,
+	})
+	if err != nil {
+		return "", err
+	}
+	return builder.String(), nil
+}
+
+func (m *timeseriesQueryModel) convertTimestamp(timestamp interface{}) (time.Time, error) {
+	if m.timestampFieldFormat == "" {
+		primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
+		if !isPrim {
+			return time.Time{}, fmt.Errorf("Timestamps must be bson DateTimes")
+		}
+		if isPrim {
+			return primTimestamp.Time(), nil
+		}
+	}
+	stringTimestamp, isString := timestamp.(string)
+	if !isString {
+		return time.Time{}, fmt.Errorf("Timestamps must be strings when Timestamp Format is supplied")
+	}
+	convertedTimestamp, err := time.Parse(m.timestampFieldFormat, stringTimestamp)
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "Could not parse timestamp")
+	}
+	return convertedTimestamp, nil
+}
+
+func (m *timeseriesQueryModel) getValues(doc timestepDocument) ([]interface{}, error) {
+	var err error
+	values := make([]interface{}, 1+len(m.fields))
+
+	timestamp, ok := doc[m.timestampFieldName]
+	if !ok {
+		return nil, fmt.Errorf("All documents must have the Timestamp Field present")
+	}
+	values[0], err = m.convertTimestamp(timestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	valueValues := values[1:]
+	var actualType data.FieldType
+	for ix, field := range m.fields {
+		name := field.Name
+		value := doc[name]
+		type_ := field.Type
+		valueValues[ix], actualType, err = convertValue(value, type_.Nullable())
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("Failed to convert value for %s", name))
+		}
+		if actualType != type_ {
+			return nil, fmt.Errorf("Type mismatch for field %s: expected %s, got %s", name, type_, actualType)
+		}
+	}
+
+	return values, nil
 }
 
 type frameCountDocument struct {
@@ -104,27 +427,24 @@ type frameCountDocument struct {
 
 type timestepDocument = map[string]interface{}
 
-func (m *queryModel) numValues() int {
-	if m.QueryType == queryTypeTimeseries {
-		return len(m.ValueFields) + 1
-	} else {
-		return len(m.ValueFields)
+func (m *queryModel) getFields() ([]field, error) {
+	if len(m.ValueFields) != len(m.ValueFields) {
+		return nil, fmt.Errorf(
+			"Value Fields and Value Field Types must be the same length (%d vs %d)",
+			len(m.ValueFields),
+			len(m.ValueFields),
+		)
 	}
-}
-
-func (m *queryModel) getFieldTypes() ([]data.FieldType, error) {
-	types := make([]data.FieldType, 0, m.numValues())
-	if m.QueryType == queryTypeTimeseries {
-		types = append(types, data.FieldTypeTime)
-	}
-	for _, typeStr := range m.ValueFieldTypes {
-		type_, ok := data.FieldTypeFromItemTypeString(typeStr)
+	fields := make([]field, len(m.ValueFields))
+	var ok bool
+	for ix, typeStr := range m.ValueFieldTypes {
+		fields[ix].Name = m.ValueFields[ix]
+		fields[ix].Type, ok = data.FieldTypeFromItemTypeString(typeStr)
 		if !ok {
 			return nil, fmt.Errorf("Invalid Type: %s", typeStr)
 		}
-		types = append(types, type_)
 	}
-	return types, nil
+	return fields, nil
 }
 func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, error) {
 	pipeline := mongo.Pipeline{}
@@ -158,61 +478,6 @@ func (m *queryModel) getPipeline(from time.Time, to time.Time) (mongo.Pipeline, 
 	return pipeline, nil
 }
 
-func (m *queryModel) getLabels(doc map[string]interface{}) data.Labels {
-	labels := make(map[string]string, len(m.LabelFields))
-	if m.QueryType == queryTypeTimeseries {
-		for _, labelKey := range m.LabelFields {
-			labelValue, ok := doc[labelKey]
-			if ok {
-				labels[labelKey] = fmt.Sprintf("%v", labelValue)
-			}
-		}
-	}
-	return data.Labels(labels)
-}
-
-func (m *queryModel) getValues(doc map[string]interface{}) ([]interface{}, error) {
-	values := make([]interface{}, 0, m.numValues())
-	var err error
-	if m.QueryType == queryTypeTimeseries {
-		timestamp, ok := doc[m.TimestampField]
-		if !ok {
-			return nil, fmt.Errorf("All documents must have the Timestamp Field present")
-		}
-		var convertedTimestamp time.Time
-		if m.TimestampFormat == "" {
-			primTimestamp, isPrim := timestamp.(bsonPrim.DateTime)
-			if !isPrim {
-				return nil, fmt.Errorf("Timestamps must be bson DateTimes")
-			}
-			if isPrim {
-				convertedTimestamp = primTimestamp.Time()
-			}
-		} else {
-			stringTimestamp, isString := timestamp.(string)
-			if !isString {
-				return nil, fmt.Errorf("Timestamps must be strings when Timestamp Format is supplied")
-			}
-			convertedTimestamp, err = time.Parse(m.TimestampFormat, stringTimestamp)
-			if err != nil {
-				return nil, errors.Wrap(err, "Could not parse timestamp")
-			}
-		}
-		values = append(values, convertedTimestamp)
-	}
-	for _, valueKey := range m.ValueFields {
-		valueValue, ok := doc[valueKey]
-		if !ok {
-			values = append(values, nil)
-		} else if asTime, isTime := valueValue.(bsonPrim.DateTime); isTime {
-			values = append(values, asTime.Time())
-		} else {
-			values = append(values, valueValue)
-		}
-	}
-	return values, nil
-}
-
 type jsonData struct {
 	URL            string `json:"url"`
 	TLS            bool   `json:"tls"`
@@ -222,9 +487,74 @@ type jsonData struct {
 	TLSServerName  string `json:"tlsServerName"`
 }
 
+type secureJsonData struct {
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	TLSCertificateKey string `json:"tlsCertificateKey"`
+}
+
+type datasource struct {
+	jsonData
+	secureJsonData
+}
+
+func (d *datasource) getAuth() (*options.Credential, error) {
+	if d.Username == "" {
+		return nil, nil
+	}
+	/*if d.Password != "" {
+		mongoURL.User = url.UserPassword(d.Username, d.Password)
+	} else {
+		mongoURL.User = url.User(d.Username)
+	}*/
+
+	return &options.Credential{
+		Username: d.Username,
+		Password: d.Password,
+	}, nil
+}
+
+func (d *datasource) getTLS() (*tls.Config, error) {
+	if !d.TLS {
+		return nil, nil
+	}
+	tlsConfig := &tls.Config{}
+	if d.TLSCA != "" {
+		tlsConfig.RootCAs = x509.NewCertPool()
+		if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(d.TLSCA)) {
+			return nil, fmt.Errorf("failed to add tlsCA")
+		}
+	}
+	if d.TLSInsecure {
+		tlsConfig.InsecureSkipVerify = true
+	}
+	if (d.TLSCertificate != "") != (d.TLSCertificateKey != "") {
+		return nil, fmt.Errorf("Must provide both tlsCertificate and tlsCertificateKey, or neither")
+	}
+	if d.TLSCertificate != "" && d.TLSCertificateKey != "" {
+		clientCert, err := tls.X509KeyPair([]byte(d.TLSCertificate), []byte(d.TLSCertificateKey))
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to parse TLS Certificate-Key Pair")
+		}
+		tlsConfig.Certificates = []tls.Certificate{clientCert}
+	}
+	if d.TLSServerName != "" {
+		tlsConfig.ServerName = d.TLSServerName
+	}
+	return tlsConfig, nil
+}
+
 func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Client, err error, internalErr error) {
-	data := jsonData{}
-	err = json.Unmarshal([]byte(pCtx.DataSourceInstanceSettings.JSONData), &data)
+	data := datasource{}
+	err = json.Unmarshal([]byte(pCtx.DataSourceInstanceSettings.JSONData), &data.jsonData)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "Failed to parse data source settings")
+	}
+	secureJsonData, err := json.Marshal(pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "Failed to remarshal secure data source settings")
+	}
+	err = json.Unmarshal(secureJsonData, &data.secureJsonData)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to parse data source settings")
 	}
@@ -236,49 +566,19 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	}
 
 	opts = opts.ApplyURI(mongoURL.String())
-	username, hasUsername := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["username"]
-	password, hasPassword := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["password"]
-	tlsCertificateKey, hasTLSCertificateKey := pCtx.DataSourceInstanceSettings.DecryptedSecureJSONData["tlsCertificateKey"]
-
-	if hasUsername && username != "" {
-		if hasPassword && password != "" {
-			mongoURL.User = url.UserPassword(username, password)
-		} else {
-			mongoURL.User = url.User(username)
-		}
-
-		credential := options.Credential{
-			Username: username,
-			Password: password,
-		}
-		opts = opts.SetAuth(credential)
+	credential, err := data.getAuth()
+	if err != nil {
+		return nil, err, nil
 	}
-
-	if data.TLS {
-		tlsConfig := &tls.Config{}
-		if data.TLSCA != "" {
-			tlsConfig.RootCAs = x509.NewCertPool()
-			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(data.TLSCA)) {
-				return nil, fmt.Errorf("failed to add tlsCA"), nil
-			}
-		}
-		if data.TLSInsecure {
-			tlsConfig.InsecureSkipVerify = true
-		}
-		if (data.TLSCertificate != "") != hasTLSCertificateKey {
-			return nil, fmt.Errorf("Must provide both tlsCertificate and tlsCertificateKey, or neither"), nil
-		}
-		if data.TLSCertificate != "" && hasTLSCertificateKey {
-			clientCert, err := tls.X509KeyPair([]byte(data.TLSCertificate), []byte(tlsCertificateKey))
-			if err != nil {
-				return nil, errors.Wrap(err, "Failed to parse TLS Certificate-Key Pair"), nil
-			}
-			tlsConfig.Certificates = []tls.Certificate{clientCert}
-		}
-		if data.TLSServerName != "" {
-			tlsConfig.ServerName = data.TLSServerName
-		}
-		opts = opts.SetTLSConfig(tlsConfig)
+	if credential != nil {
+		opts.SetAuth(*credential)
+	}
+	tlsConfig, err := data.getTLS()
+	if err != nil {
+		return nil, err, nil
+	}
+	if tlsConfig != nil {
+		opts.SetTLSConfig(tlsConfig)
 	}
 
 	mongoClient, err := mongo.Connect(ctx, opts)
@@ -289,31 +589,17 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 	return mongoClient, nil, nil
 }
 
-func (m *queryModel) getLabelsID(labels data.Labels) string {
-	// TODO: Might not work, need to find a fast but stable way to identify a set of labels
-	// labelsID := fmt.Sprintf("%#v", map[string]string(labels))
-	if len(m.LabelFields) == 0 {
-		return ""
-	}
-	labelsID := fmt.Sprintf("%s=%s", m.LabelFields[0], labels[m.LabelFields[0]])
-	for _, label := range m.LabelFields[1:] {
-		labelsID += fmt.Sprintf(",%s=%s", label, labels[label])
-	}
-	return labelsID
+type resultParser struct {
+	frames map[string]*data.Frame
+	model  resolvedQueryModel
 }
 
-func (m *queryModel) getFrameFieldNames(labelsID string) []string {
-	fieldNames := make([]string, 0, m.numValues())
-	if m.QueryType == queryTypeTimeseries {
-		fieldNames = append(fieldNames, m.TimestampField)
-	}
-	fieldNames = append(fieldNames, m.ValueFields...)
-	return fieldNames
-}
-
-func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc timestepDocument, fieldTypes []data.FieldType) (err error) {
+func (p *resultParser) parseQueryResultDocument(doc timestepDocument) (err error) {
 	defer func() {
 		if panic_ := recover(); panic_ != nil {
+			buf := make([]byte, 1<<16)
+			buflen := runtime.Stack(buf, false)
+			log.DefaultLogger.Error("Panic while parsing document", "document", doc, "error", panic_, "trace", string(buf[:buflen]))
 			switch panic_.(type) {
 			case error:
 				err = panic_.(error)
@@ -322,22 +608,76 @@ func (m *queryModel) parseQueryResultDocument(frames map[string]*data.Frame, doc
 			}
 		}
 	}()
-	labels := m.getLabels(doc)
-	labelsID := m.getLabelsID(labels)
-	frame, ok := frames[labelsID]
+	labels, labelsID := p.model.getLabels(doc)
+	frame, ok := p.frames[labelsID]
 	if !ok {
 		log.DefaultLogger.Debug("Creating frame for unique label combination", "doc", doc, "labels", labels, "labelsID", labelsID)
-		frame = data.NewFrameOfFieldTypes(labelsID, 0, fieldTypes...)
-		frame.SetFieldNames(m.getFrameFieldNames(labelsID)...)
-		frames[labelsID] = frame
+		frame, err = p.model.makeFrame(labelsID, labels)
+		if err != nil {
+			return err
+		}
+		p.frames[labelsID] = frame
 	}
-	row, err := m.getValues(doc)
+	row, err := p.model.getValues(doc)
 	if err != nil {
 		return errors.Wrap(err, "Failed to extract value columns")
 	}
+	log.DefaultLogger.Debug("Parsed row", "row", row, "id", labelsID)
 	frame.AppendRow(row...)
 
 	return nil
+}
+
+type bufferingCursor struct {
+	*mongo.Cursor
+	buffer []timestepDocument
+}
+
+func (c *bufferingCursor) Next(ctx context.Context) (doc timestepDocument, more bool, err error) {
+	more = c.Cursor.Next(ctx)
+	if !more {
+		err = c.Cursor.Err()
+		return
+	}
+
+	doc = make(timestepDocument)
+	err = c.Cursor.Decode(&doc)
+	if err != nil {
+		more = false
+		return
+	}
+
+	c.buffer = append(c.buffer, doc)
+	more = true
+	return
+}
+
+type bufferedCursor struct {
+	*mongo.Cursor
+	buffer []timestepDocument
+}
+
+func (c *bufferedCursor) Next(ctx context.Context) (doc timestepDocument, more bool, decodeErr bool, err error) {
+	if len(c.buffer) != 0 {
+		doc = c.buffer[0]
+		c.buffer = c.buffer[1:]
+		more = true
+		return
+	}
+
+	more = c.Cursor.Next(ctx)
+	if !more {
+		err = c.Cursor.Err()
+		return
+	}
+
+	doc = make(timestepDocument)
+	err = c.Decode(&doc)
+	if err != nil {
+		decodeErr = true
+		more = false
+	}
+	return
 }
 
 func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
@@ -354,24 +694,7 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 		return response
 	}
 
-	fieldTypes, err := qm.getFieldTypes()
-	if err != nil {
-		response.Error = errors.Wrap(err, "Could not determine field types")
-		return response
-	}
-
-	numUserTypes := len(fieldTypes)
-	if qm.QueryType == queryTypeTimeseries {
-		numUserTypes--
-	}
-	if qm.numValues() != len(fieldTypes) {
-		response.Error = fmt.Errorf(
-			"Value Fields and Value Field Types must be the same length (%d vs %d)",
-			qm.numValues(),
-			numUserTypes,
-		)
-		return response
-	}
+	log.DefaultLogger.Debug("Query Model Parsed", "queryModel", qm)
 
 	pipeline, err := qm.getPipeline(query.TimeRange.From, query.TimeRange.To)
 	if err != nil {
@@ -392,39 +715,109 @@ func (d *MongoDBDatasource) query(ctx context.Context, pCtx backend.PluginContex
 
 	collection := mongoClient.Database(qm.Database).Collection(qm.Collection)
 
-	frames := map[string]*data.Frame{}
-
 	log.DefaultLogger.Info("Querying MongoDB", "context", pCtx, "query", query, "pipeline", pipeline)
 	cursor, err := collection.Aggregate(ctx, pipeline)
 	if err != nil {
 		response.Error = errors.Wrap(err, "Failed to send query to mongo")
 		return response
 	}
-	for cursor.Next(ctx) {
-		doc := timestepDocument{}
-		err = cursor.Decode(&doc)
+
+	buffered := bufferedCursor{
+		Cursor: cursor,
+	}
+
+	var fields []field
+
+	if qm.SchemaInference {
+		buffering := bufferingCursor{
+			Cursor: cursor,
+			buffer: make([]timestepDocument, 0, qm.SchemaInferenceDepth),
+		}
+
+		ignored := make(map[string]struct{}, 1+len(qm.LabelFields))
+		if qm.QueryType == queryTypeTimeseries {
+			ignored[qm.TimestampField] = struct{}{}
+		}
+		for _, name := range qm.LabelFields {
+			ignored[name] = struct{}{}
+		}
+
+		state := NewSchemaInference(ignored)
+
+		doc, more, err := buffering.Next(ctx)
+		for len(buffering.buffer) < qm.SchemaInferenceDepth && more {
+			err = state.updateDoc(doc)
+			if err != nil {
+				break
+			}
+
+			doc, more, err = buffering.Next(ctx)
+		}
 		if err != nil {
-			response.Error = errors.Wrap(err, "Failed to parse document")
+			response.Error = errors.Wrap(err, "Schema Inference Failed")
 			return response
 		}
-		err = qm.parseQueryResultDocument(frames, doc, fieldTypes)
+		fields = state.finish()
+		log.DefaultLogger.Debug(
+			"Inferred schema",
+			"requestedDocs", qm.SchemaInferenceDepth,
+			"bufferedDocs", len(buffering.buffer),
+			"fields", fields,
+		)
+		buffered.buffer = buffering.buffer
+	} else {
+		fields, err = qm.getFields()
 		if err != nil {
-			response.Error = fmt.Errorf("Bad document: %s, %v", err, doc)
+			response.Error = err
 			return response
 		}
 	}
-	if cursor.Err() != nil {
-		response.Error = errors.Wrap(cursor.Err(), "Failed to get next result document")
+
+	resolvedModel, err := qm.resolve(fields)
+	if err != nil {
+		response.Error = err
 		return response
 	}
 
+	log.DefaultLogger.Debug(
+		"Resolved query model",
+		"model", resolvedModel,
+	)
+
+	parser := resultParser{
+		frames: map[string]*data.Frame{},
+		model:  resolvedModel,
+	}
+
+	docCount := 0
+	doc, more, decodeErr, err := buffered.Next(ctx)
+	for more {
+		err = parser.parseQueryResultDocument(doc)
+		if err != nil {
+			response.Error = fmt.Errorf("Failed to convert document number %d: %s, %v", docCount, err, doc)
+			return response
+		}
+		doc, more, decodeErr, err = buffered.Next(ctx)
+		docCount++
+	}
+	if err != nil {
+		if decodeErr {
+			response.Error = errors.Wrap(err, fmt.Sprintf("Failed to decode document number %d", docCount))
+			return response
+		} else {
+			response.Error = errors.Wrap(err, fmt.Sprintf("Failed to fetch result document number %d", docCount+1))
+			return response
+		}
+	}
+	log.DefaultLogger.Info(fmt.Sprintf("Processed %d documents", docCount))
+
 	// add the frames to the response.
-	response.Frames = make([]*data.Frame, 0, len(frames))
-	for _, frame := range frames {
+	response.Frames = make([]*data.Frame, 0, len(parser.frames))
+	for _, frame := range parser.frames {
 		response.Frames = append(response.Frames, frame)
 	}
 
-	log.DefaultLogger.Info("query finished", "context", pCtx, "query", query, "response", response)
+	log.DefaultLogger.Debug("query finished", "context", pCtx, "query", query, "response", response)
 	return response
 }
 

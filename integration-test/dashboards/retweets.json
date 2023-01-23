@@ -24,6 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -38,6 +39,8 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -93,7 +96,8 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "right"
+          "placement": "right",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -114,8 +118,11 @@
           "labelFields": [
             "user_url"
           ],
+          "legendFormat": "{{.Value}}({{.Labels.user_url | trimPrefix \"http://t.co/\"}})",
           "queryType": "Timeseries",
           "refId": "A",
+          "schemaInference": false,
+          "schemaInferenceDepth": 20,
           "timestampField": "created_at",
           "timestampFormat": "Mon Jan 02 15:04:05 -0700 2006",
           "valueFieldTypes": [
@@ -131,14 +138,14 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 36,
+  "schemaVersion": 37,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "mongodb",
           "value": "mongodb"
         },
@@ -158,14 +165,14 @@
         "current": {
           "selected": true,
           "text": [
+            "http://t.co/vVcENSGcDg",
             "http://t.co/3Xvuxw2JEG",
-            "http://t.co/Lg7nFDkidP",
-            "http://t.co/vVcENSGcDg"
+            "http://t.co/Lg7nFDkidP"
           ],
           "value": [
+            "http://t.co/vVcENSGcDg",
             "http://t.co/3Xvuxw2JEG",
-            "http://t.co/Lg7nFDkidP",
-            "http://t.co/vVcENSGcDg"
+            "http://t.co/Lg7nFDkidP"
           ]
         },
         "datasource": {
@@ -200,6 +207,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Retweets",
-  "version": 0,
+  "uid": "DLIPtXhVk",
+  "version": 1,
   "weekStart": ""
 }

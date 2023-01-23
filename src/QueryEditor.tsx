@@ -99,6 +99,26 @@ export class QueryEditor extends PureComponent<Props> {
     onRunQuery();
   };
 
+  onLegendFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, legendFormat: event.target.value });
+    // executes the query
+    onRunQuery();
+  };
+
+  onSchemaInferenceChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, schemaInference: event.target.checked });
+    // executes the query
+    onRunQuery();
+  };
+  onSchemaInferenceDepthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, schemaInferenceDepth: parseInt(event.target.value, 10) });
+    // executes the query
+    onRunQuery();
+  };
+
   onValueFieldChange = (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     let newValueFields = Array.from(query.valueFields);
@@ -255,35 +275,19 @@ export class QueryEditor extends PureComponent<Props> {
                   ))}
                   <Button onClick={this.onLabelFieldAppend}>+</Button>
               </div>
+              <InlineField
+                    labelWidth={this.labelWidth}
+                    label="Legend Format"
+                    tooltip="Series name override. Replacements are:\n{{.Value}}: Value field name.\n{{.Labels.field_name}}: Value of the label with name 'field_name'\n{{.Labels}}: key=value,... for all labels\nSee https://pkg.go.dev/text/template for full syntax.\nFunctions from https://masterminds.github.io/sprig/ are provided"
+              >
+                <Input
+                  value={query.legendFormat || ""}
+                  onChange={this.onLegendFormatChange}
+                />
+              </InlineField>
             </>
           ) : false }
-          <InlineFormLabel
-            width={this.labelWidth}
-            tooltip="These fields contain measurements or other recorded values. You must also specify the data types (float64, uint64, string, etc) for each field. Prefix with a star if a field may not appear in every document for a given series. See https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/data#FieldType for a list of valid types. Nested fields are not supported, please project to a flat document"
-          >Value Fields</InlineFormLabel>
-          <div>
-            {zip(query.valueFields, query.valueFieldTypes).map((field, index) => (
-                <InlineFieldRow key={index}>
-                    <Input
-                      onChange={this.onValueFieldChange(index)}
-                      width={this.longWidth}
-                      value={field[0]}
-                      placeholder="name"
-                    ></Input>
-                    <InlineField label=":">
-                        <Input
-                          onChange={this.onValueFieldTypeChange(index)}
-                          width={this.longWidth}
-                          value={field[1]}
-                          placeholder="type"
-                        ></Input>
-                    </InlineField>
-                    <Button onClick={this.onValueFieldRemove(index)}>-</Button>
-                </InlineFieldRow>
-            ))}
-            <Button onClick={this.onValueFieldAppend}>+</Button>
-         </div>
-         { (query.queryType || this.defaultQueryType) === MongoDBQueryType.Timeseries ? (
+          { (query.queryType || this.defaultQueryType) === MongoDBQueryType.Timeseries ? (
             <>
               <InlineField
                   label="Automatic Time-Bound"
@@ -307,8 +311,64 @@ export class QueryEditor extends PureComponent<Props> {
               </InlineField>
             </>
           ) : false }
-        </FieldSet>
 
+          <div className="gf-form">
+            <InlineFormLabel
+              width={this.labelWidth}
+              tooltip="If enabled, Grafana will attempt to figure out the types of your data based on the first few documents. Otherwise, you will need to specify the names and datatypes of each field"
+            >
+              Infer Schema
+            </InlineFormLabel>
+            <InlineSwitch
+              value={query.schemaInference || false}
+              onChange={this.onSchemaInferenceChange}
+            />
+          </div>
+
+          { query.schemaInference ?
+            <>
+              <InlineField
+                    labelWidth={this.labelWidth}
+                    label="Schema Inference Depth"
+                    tooltip="How many documents to consider for inference before assuming no new fields will be present. If all documents have the same fields, you can set this to 1"
+              >
+                <Input
+                    value={`${query.schemaInferenceDepth}`}
+                    onChange={this.onSchemaInferenceDepthChange}
+                    type="number"
+                />
+              </InlineField>
+            </>
+            :
+            <>
+              <InlineFormLabel
+                width={this.labelWidth}
+                tooltip="These fields contain measurements or other recorded values. You must also specify the data types (float64, uint64, string, etc) for each field. Prefix with a star if a field may not appear in every document for a given series. See https://pkg.go.dev/github.com/grafana/grafana-plugin-sdk-go/data#FieldType for a list of valid types. Nested fields are not supported, please project to a flat document"
+              >Value Fields</InlineFormLabel>
+              {zip(query.valueFields, query.valueFieldTypes).map((field, index) => (
+                  <InlineFieldRow key={index}>
+                      <Input
+                        onChange={this.onValueFieldChange(index)}
+                        width={this.longWidth}
+                        value={field[0]}
+                        placeholder="name"
+                      ></Input>
+                      <InlineField label=":">
+                          <Input
+                            onChange={this.onValueFieldTypeChange(index)}
+                            width={this.longWidth}
+                            value={field[1]}
+                            placeholder="type"
+                          ></Input>
+                      </InlineField>
+                      <Button onClick={this.onValueFieldRemove(index)}>-</Button>
+                  </InlineFieldRow>
+              ))}
+              <Button onClick={this.onValueFieldAppend}>+</Button>
+            </>
+          }
+
+        </FieldSet>
         <InlineFormLabel
           width={this.labelWidth}
           tooltip="Argument to db.collection.aggregate(...), a JSON array of pipeline stage objects. Helper functions like new Date() or ObjectId() are not supported, consult the MongoDB manual at https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/ to see how to represent these functions in pure JSON"

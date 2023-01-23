@@ -9,14 +9,16 @@ fi
 
 export DOCKER_BUILDKIT=1
 
-IMAGE_REPO=localhost/meln5674/grafana-mongodb-community-plugin
+IMAGE_REPO=${IMAGE_REPO:-localhost/meln5674/grafana-mongodb-community-plugin}
 
-IMAGE_TAG=$(md5sum build-env.Dockerfile | awk '{ print $1 }')
+IMAGE_TAG=${IMAGE_TAG:-$(md5sum build-env.Dockerfile | awk '{ print $1 }')}
 
-IMAGE="${IMAGE_REPO}/${IMAGE_TAG}"
+IMAGE="${IMAGE_REPO}:${IMAGE_TAG}"
 
-docker build -f build-env.Dockerfile -t "${IMAGE}" .
 
+if [ -z "${NO_BUILD_IMAGE}" ]; then
+    docker build -f build-env.Dockerfile -t "${IMAGE}" .
+fi
 
 DOCKER_RUN_ARGS=(
     --rm
@@ -42,6 +44,7 @@ DOCKER_RUN_ARGS+=(
     -v /etc/group:/etc/group
     -e HOME
 )
+
 for group in $(id -G); do
     DOCKER_RUN_ARGS+=( --group-add "${group}" )
 done

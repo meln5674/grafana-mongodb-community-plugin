@@ -1,0 +1,106 @@
+name: CI
+
+env:
+  NO_BUILD_IMAGE: '1'
+  IMAGE_REPO: ghcr.io/meln5674/grafana-mongodb-community-plugin
+  IMAGE_TAG: github-actions
+
+on:
+  push:
+    branches: '**' 
+  pull_request:
+    branches: '**'
+    tags: '**'
+  workflow_dispatch: {}
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - name: Get go cache directory path
+        id: gopath-dir-path
+        run: echo "::set-output name=dir::$(echo ~/go)"
+
+      - name: Cache yarn cache
+        uses: actions/cache/restore@v3
+        id: restore-yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn
+          restore-keys: |
+            ${{ runner.os }}-yarn
+
+      - name: Cache gopath
+        uses: actions/cache/restore@v3
+        id: restore-gopath
+        with:
+          path: ${{ steps.gopath-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-go
+          restore-keys: |
+            ${{ runner.os }}-go
+
+      - name: Install Dependencies
+        id: install-dependencies
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn deps
+
+      - name: Cache yarn cache
+        uses: actions/cache/save@v3
+        id: cache-yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn
+          restore-keys: |
+            ${{ runner.os }}-yarn
+
+      - name: Cache gopath
+        uses: actions/cache/save@v3
+        id: cache-gopath
+        with:
+          path: ${{ steps.gopath-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-go
+          restore-keys: |
+            ${{ runner.os }}-go
+
+
+      - name: Build Frontend
+        id: build-frontend
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn build
+
+      - name: Build Backend
+        id: build-backend
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn backend
+
+      - name: Build Plugin Zip
+        id: build-plugin-zip
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn plugin
+
+      - name: Run Integration Tests
+        id: run-integration-tests
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn integration-test
+
+      - name: Create Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        if: contains(github.ref, 'tags/v')
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ github.ref }}"
+          prerelease: true
+          title: "${{ github.ref }}"
+          files: |
+            meln5674-mongodb-community.zip

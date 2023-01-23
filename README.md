@@ -56,6 +56,7 @@ GF_INSTALL_PLUGINS=meln5674-mongodb-community=<your repository url>/meln5674-mon
 
 Consult your grafana distribution documentation (e.g. https://github.com/bitnami/charts/tree/master/bitnami/grafana) for how to specify plugins to install
 
+
 ### Development
 
 Copy built repository to `<grafana plugins dir>/meln5674-mongodb-community`
