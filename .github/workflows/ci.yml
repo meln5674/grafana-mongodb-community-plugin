@@ -8,6 +8,7 @@ env:
 on:
   push:
     branches: '**' 
+    tags: '**'
   pull_request:
     branches: '**'
     tags: '**'
