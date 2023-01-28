@@ -376,7 +376,7 @@ export class QueryEditor extends PureComponent<Props> {
           Aggregation
         </InlineFormLabel>
         <CodeEditor
-          height="200px"
+          height="800px"
           showLineNumbers={true}
           language="json"
           value={query.aggregation || ''}
