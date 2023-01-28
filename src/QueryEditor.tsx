@@ -278,7 +278,7 @@ export class QueryEditor extends PureComponent<Props> {
               <InlineField
                     labelWidth={this.labelWidth}
                     label="Legend Format"
-                    tooltip="Series name override. Replacements are:\n{{.Value}}: Value field name.\n{{.Labels.field_name}}: Value of the label with name 'field_name'\n{{.Labels}}: key=value,... for all labels\nSee https://pkg.go.dev/text/template for full syntax.\nFunctions from https://masterminds.github.io/sprig/ are provided"
+                    tooltip={"Series name override. Replacements are:\n{{.Value}}: Value field name.\n{{.Labels.field_name}}: Value of the label with name 'field_name'\n{{.Labels}}: key=value,... for all labels\nSee https://pkg.go.dev/text/template for full syntax.\nFunctions from https://masterminds.github.io/sprig/ are provided"}
               >
                 <Input
                   value={query.legendFormat || ""}
