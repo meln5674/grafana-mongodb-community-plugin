@@ -270,16 +270,22 @@ func (m *tableQueryModel) getValues(doc timestepDocument) ([]interface{}, error)
 	for ix, field := range m.fields {
 		name := field.Name
 		type_ := field.Type
-		value := doc[name]
+		value, ok := doc[name]
+		if !ok || value == nil {
+			if !type_.Nullable() {
+				return nil, fmt.Errorf("Field %s was null or absent, but is not nullable. If using schema inference, please increase the depth to the first document missing this field, or manually specify the schema", name)
+			}
+			values[ix] = nil
+			continue
+		}
+
 		values[ix], actualType, err = convertValue(value, type_.Nullable())
 		if err != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("Failed to convert value for %s", name))
 		}
-		if values[ix] == nil && !type_.Nullable() {
-			return nil, fmt.Errorf("Field %s was null or absent, but is not nullable. If using schema inference, please increase the depth to the first document missing this field, or manually specify the schema", name)
-		}
+
 		if values[ix] != nil && actualType != type_ {
-			return nil, fmt.Errorf("Type mismatch for field %s: expected %s, got %s", name, type_, actualType)
+			return nil, fmt.Errorf("Type mismatch for field %s: expected %s, got %s (%#v)", name, type_, actualType, values[ix])
 		}
 	}
 	return values, nil
