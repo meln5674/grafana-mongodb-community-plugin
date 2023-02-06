@@ -375,13 +375,17 @@ export class QueryEditor extends PureComponent<Props> {
         >
           Aggregation
         </InlineFormLabel>
-        <CodeEditor
-          height="800px"
-          showLineNumbers={true}
-          language="json"
-          value={query.aggregation || ''}
-          onBlur={this.onAggregationChange}
-        ></CodeEditor>
+        <div 
+          style={{ resize: "vertical" }}
+        >
+          <CodeEditor
+            height="300px"
+            showLineNumbers={true}
+            language="json"
+            value={query.aggregation || ''}
+            onBlur={this.onAggregationChange}
+          ></CodeEditor>
+        </div>
       </>
     );
   }
