@@ -1,64 +1,81 @@
 ARG BASE_IMAGE=docker.io/library/debian:9
+ARG GO_VERSION=1.18.4
+ARG GO_IMAGE=docker.io/library/golang:${GO_VERSION}
+ARG DOCKER_VERSION=20.10.23
+ARG DOCKER_IMAGE=docker.io/library/docker:${DOCKER_VERSION}-cli
+ARG ARCH=amd64
+ARG NODE_ARCH=x64
+ARG OS=linux
 
 FROM ${BASE_IMAGE} AS base
 
-RUN apt-get update && apt-get install -y curl xz-utils git gcc g++ zip unzip make
+RUN apt-get update && apt-get install -y curl xz-utils 
 
-ENV PATH=${PATH}:/usr/local/lib/nodejs/bin:/usr/local/go/bin:/gopath/bin
-ENV GOPATH=/gopath
+ENV PATH=${PATH}:/usr/local/lib/nodejs/bin:/usr/local/go/bin:/go/bin
+ENV GOPATH=/go
 
 FROM base AS kubectl
 
 ARG KUBECTL_VERSION=v1.22.0
 
-RUN curl -vfL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" > /usr/local/bin/kubectl \
- && chmod +x /usr/local/bin/kubectl
+ARG ARCH
+ARG OS
+
+ADD "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl" /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/kubectl
 
 FROM base AS node
 
 ARG NODE_VERSION=v14.20.0
 
+ARG NODE_ARCH
+ARG OS
+
 RUN mkdir -p /usr/local/lib/nodejs \
- && curl -vfL https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz | tar -xJ --strip-components=1 -C /usr/local/lib/nodejs \
- && npm install -g yarn @grafana/toolkit
+ && curl -vfL https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-${OS}-${NODE_ARCH}.tar.xz | tar -xJ --strip-components=1 -C /usr/local/lib/nodejs \
+ && npm install -g yarn
 
-FROM base AS go
-
-RUN mkdir -p /usr/local/go \
- && curl -vfL https://go.dev/dl/go1.18.4.linux-amd64.tar.gz | tar -xz -C /usr/local/
+FROM ${GO_IMAGE} AS go
 
 RUN go install github.com/magefile/mage@v1.13.0
 
-FROM base AS docker
-
-ARG DOCKER_VERSION=20.10.9
-
-RUN curl -vfL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar xz --strip-components=1 -C /usr/local/bin docker/docker
+FROM ${DOCKER_IMAGE} AS docker
 
 FROM base AS helm
 
+ARG ARCH
+ARG OS
 ARG HELM_VERSION=v3.10.3
 
-RUN curl -vfL https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz | tar xz --strip-components=1 -C /usr/local/bin linux-amd64/helm
+ADD https://get.helm.sh/helm-${HELM_VERSION}-${OS}-${ARCH}.tar.gz /usr/local/bin/
+
+RUN tar -xzf /usr/local/bin/helm-${HELM_VERSION}-${OS}-${ARCH}.tar.gz -C /usr/local/bin
 
 FROM base AS kind
 
+ARG ARCH
+ARG OS
 ARG KIND_VERSION=v0.14.0
 
-RUN curl -vfL https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64 > /usr/local/bin/kind \
- && chmod +x /usr/local/bin/kind
+ADD https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCH} /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/kind-${OS}-${ARCH}
 
 FROM base
 
-RUN 
+ARG ARCH
+ARG OS
+
+RUN apt-get install -y git gcc g++ zip unzip make
 
 COPY --from=kubectl /usr/local/bin/kubectl /usr/local/bin/kubectl
-COPY --from=node /usr/local/lib/nodejs /usr/local/lib/nodejs
-COPY --from=go /usr/local/go /usr/local/go
-COPY --from=go ${GOPATH} ${GOPATH}
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=kind /usr/local/bin/kind /usr/local/bin/kind
-COPY --from=helm /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=kind /usr/local/bin/kind-${OS}-${ARCH} /usr/local/bin/kind
+COPY --from=helm /usr/local/bin/${OS}-${ARCH}/helm /usr/local/bin/helm
+COPY --from=go /usr/local/go /usr/local/go
+COPY --from=go /go/bin/mage /usr/local/bin/mage
+COPY --from=node /usr/local/lib/nodejs /usr/local/lib/nodejs
 
 RUN node --version \
  && npm --version \
@@ -71,7 +88,6 @@ RUN node --version \
  && make --version \
  && helm version \
  && unzip -h \
- && grafana-toolkit --help
  
 ENV GOPATH=/go
 VOLUME /go
