@@ -50,8 +50,6 @@ RUN curl -vfL https://github.com/kubernetes-sigs/kind/releases/download/${KIND_V
 
 FROM base
 
-RUN 
-
 COPY --from=kubectl /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=node /usr/local/lib/nodejs /usr/local/lib/nodejs
 COPY --from=go /usr/local/go /usr/local/go
