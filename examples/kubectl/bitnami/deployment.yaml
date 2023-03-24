@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: grafana
+        image: bitnami/grafana:latest
+        env:
+        - name: ZIP_URL
+          value: ${ZIP_URL} # !!! You must manually set this in this file
+        - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+          value: meln5674-mongodb-community
+        - name: GF_INSTALL_PLUGINS
+          value: meln5674-mongodb-community=$(ZIP_URL)

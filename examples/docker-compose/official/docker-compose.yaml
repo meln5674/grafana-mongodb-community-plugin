@@ -1,0 +1,8 @@
+grafana:
+  image: grafana/grafana-oss:latest
+  restart: unless-stopped
+  ports:
+    - "3000:3000"
+  environment:
+    - "GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=meln5674-mongodb-community"
+    - "GF_INSTALL_PLUGINS=${ZIP_URL};meln5674-mongodb-community"
