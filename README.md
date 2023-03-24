@@ -28,78 +28,9 @@ Then copy the produced `meln5674-mongodb-community.zip` file to your artifact re
 
 To install the plugin as unsigned, choose a version from the [Releases Page](https://github.com/meln5674/grafana-mongodb-community-plugin/releases), and either download the ZIP file, or copy its URL.
 
-### Bare Metal
+### Installation methods
 
-On your grafana server, run
-
-```bash
-grafana-cli --pluginUrl ${ZIP_URL} meln5674-mongodb-community
-```
-
-then, if using the plugin unsigned, add the following to your `grafana.ini` file:
-
-```ini
-[plugins]
-allow_loading_unsigned_plugins=meln5674-mongodb-community
-```
-
-#### Docker
-
-Set the environment variable
-
-```bash
-GF_INSTALL_PLUGINS=${ZIP_URL}
-```
-
-as well as the following, if using the plugin unsigned
-```bash
-GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=meln5674-mongodb-community
-```
-
-e.g.
-
-```bash
-PLUGIN_VERSION=<See https://github.com/meln5674/grafana-mongodb-community-plugin/releases>
-docker run \
-    -d \
-    -p 3000:3000 \
-    -e GF_INSTALL_PLUGINS=meln5674-mongodb-community=https://github.com/meln5674/grafana-mongodb-community-plugin/releases/download/${PLUGIN_VERSION}/meln5674-mongodb-community.zip \
-    -e GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=meln5674-mongodb-community \
-    bitnami/grafana:latest
-```
-
-#### Kubernetes
-
-Consult your grafana distribution documentation (e.g. https://github.com/bitnami/charts/tree/master/bitnami/grafana) for how to specify plugins to install.
-
-For a simple deployment, set the following
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: grafana
-spec:
-  selector:
-    matchLabels:
-      app: grafana
-  template:
-    metadata:
-      labels:
-        app: grafana
-    spec:
-      restartPolicy: Always
-      containers:
-      - name: grafana
-        image: bitnami/grafana:latest
-        env:
-        - name: PLUGIN_VERSION
-          value: <See https://github.com/meln5674/grafana-mongodb-community-plugin/releases>
-        - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
-          value: meln5674-mongodb-community
-        - name: GF_INSTALL_PLUGINS
-          value: meln5674-mongodb-community=https://github.com/meln5674/grafana-mongodb-community-plugin/releases/download/$(PLUGIN_VERSION)/meln5674-mongodb-community.zip
-```
+To view examples of installing the plugin see [this directory](./examples)
 
 ### Development
 
