@@ -6,7 +6,7 @@
     "backend": "go vet ./... && mage -v",
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "clean": "rm -rf meln5674-mongodb-community dist/",
-    "deps": "yarn install && go mod download",
+    "deps": "stat ${GOPATH}; stat ${GOPATH}/pkg ; yarn install && go mod download",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
     "e2e": "yarn exec cypress install && yarn exec grafana-e2e run",
     "e2e:update": "yarn exec cypress install && yarn exec grafana-e2e run --update-screenshots",

@@ -50,6 +50,7 @@ jobs:
         id: install-dependencies
         run: |
           export GOPATH=~/go
+          mkdir -p "${GOPATH}"
           ./build-env.sh yarn deps
 
       - name: Cache yarn cache
