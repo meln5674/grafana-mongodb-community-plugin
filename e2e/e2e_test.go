@@ -3,6 +3,11 @@ package e2e_test
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
@@ -43,8 +48,41 @@ var _ = Describe("The plugin", func() {
 			b.Click(datasource)
 			Eventually(preprovisionedAlert).Should(b.Exist())
 		})
-
 	}
+
+	queries := []string{
+		"weather/timeseries",
+		"weather/timeseries-date",
+		"weather/table",
+		"tweets/timeseries",
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: func(*http.Request) (*url.URL, error) {
+				return url.Parse("http://localhost:8080")
+			},
+		},
+	}
+
+	for _, query := range queries {
+		It(fmt.Sprintf("should execute the %s query", query), func() {
+			f, err := os.Open(filepath.Join("../integration-test/queries", query+".json"))
+			Expect(err).ToNot(HaveOccurred())
+
+			req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ds/query", f)
+			Expect(err).ToNot(HaveOccurred())
+			req.SetBasicAuth("admin", "adminPassword")
+			req.Header.Set("accept", "application/json, text/plain, */*")
+			req.Header.Set("content-type", "application/json")
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(GinkgoWriter, resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+	}
+
 })
 
 func nodes(sel interface{}) []*cdp.Node {
