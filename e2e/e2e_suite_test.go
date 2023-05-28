@@ -66,6 +66,9 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	gk8s.Options(gingk8s.SuiteOpts{
 		NoSuiteCleanup: true,
 	})
+	DeferCleanup(func() {
+		gk8s.Kubectl(ctx, &cluster, "logs", "mongodb-0").Run()
+	})
 	gk8s.Setup(ctx)
 
 	bopts := []chromedp.ExecAllocatorOption{
