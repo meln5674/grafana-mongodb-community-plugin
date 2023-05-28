@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=docker.io/library/debian:9
+ARG BASE_IMAGE=docker.io/chromedp/headless-shell:115.0.5790.3
 
 FROM ${BASE_IMAGE} AS base
 
@@ -27,7 +27,8 @@ FROM base AS go
 RUN mkdir -p /usr/local/go \
  && curl -vfL https://go.dev/dl/go1.18.4.linux-amd64.tar.gz | tar -xz -C /usr/local/
 
-RUN go install github.com/magefile/mage@v1.13.0
+RUN go install github.com/magefile/mage@v1.15.0 \
+ && go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.5
 
 FROM base AS docker
 
@@ -73,3 +74,7 @@ RUN node --version \
  
 ENV GOPATH=/go
 VOLUME /go
+
+ENV IT_IN_CONTAINER=1
+
+ENTRYPOINT []

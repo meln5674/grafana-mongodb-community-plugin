@@ -1,0 +1,46 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-tls-ca
+spec:
+  isCA: true
+  commonName: mongodb-tls-ca
+  secretName: mongodb-tls-ca
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: mongodb-tls-ca
+spec:
+  ca:
+    secretName: mongodb-tls-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-mtls-client
+spec:
+  isCA: true
+  commonName: mongodb-mtls-client
+  secretName: mongodb-mtls-client
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: mongodb-tls-ca
+    kind: Issuer
+    group: cert-manager.io

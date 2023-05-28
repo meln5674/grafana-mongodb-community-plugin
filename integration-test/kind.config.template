@@ -4,5 +4,9 @@ name: meln5674-mongodb-community-it
 nodes:
 - role: control-plane
   extraMounts:
-  - hostPath: 
+  - hostPath: {{ .Env.PWD }} # This is run from ./e2e
     containerPath: /mnt/host/grafana-mongodb-community-plugin
+  extraPortMappings:
+  - containerPort: 8080
+    hostPort: 8080
+    listenAddress: "127.0.0.1"

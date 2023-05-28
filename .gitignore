@@ -33,3 +33,5 @@ e2e-results/
 *.zip
 
 integration-test/vendor
+integration-test/images
+integration-test/groups
