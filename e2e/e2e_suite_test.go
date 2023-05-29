@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"hash/adler32"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/chromedp/chromedp"
 	"github.com/meln5674/gingk8s"
+	"github.com/meln5674/gosh"
 	"github.com/onsi/biloba"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,6 +28,22 @@ var b *biloba.Biloba
 var gk8s *gingk8s.Gingk8s
 
 var _ = BeforeSuite(func(ctx context.Context) {
+	f, err := os.Create("../integration-test/datasets/download/tweets.zip")
+	resp, err := http.Get("https://github.com/ozlerhakan/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true")
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	_, err = io.Copy(f, resp.Body)
+	Expect(err).ToNot(HaveOccurred())
+
+	f, err = os.Create("../integration-test/datasets/download/transactions.json")
+	resp, err = http.Get("https://github.com/fieldsets/mongodb-sample-datasets/blob/main/sample_analytics/transactions.json?raw=true")
+	Expect(err).ToNot(HaveOccurred())
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	_, err = io.Copy(f, resp.Body)
+	Expect(err).ToNot(HaveOccurred())
+
+	Expect(gosh.Command("unzip", "-o", "../integration-test/datasets/download/tweets.zip", "-d", "../integration-test/datasets/download/tweets/").WithStreams(gingk8s.GinkgoOutErr).Run()).To(Succeed())
+
 	gk8s := gingk8s.ForSuite(GinkgoT())
 
 	ingressNginxImageID := gk8s.ThirdPartyImage(ingressNginxImage)
