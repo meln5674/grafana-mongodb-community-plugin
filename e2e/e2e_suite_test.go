@@ -11,6 +11,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/meln5674/gingk8s"
+	"github.com/meln5674/gosh"
 	"github.com/onsi/biloba"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,6 +47,34 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	gk8s.ClusterAction(clusterID, "MongoDB (No Auth) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-no-auth", RetryPeriod: 5 * time.Second})
 	gk8s.ClusterAction(clusterID, "MongoDB (TLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-tls", RetryPeriod: 5 * time.Second})
 	gk8s.ClusterAction(clusterID, "MongoDB (mTLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-mtls", RetryPeriod: 5 * time.Second})
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "inspect", "grafana-mongodb-control-plane").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "exec", "grafana-mongodb-control-plane", "ls", "/mnt/host/grafana-mongodb-community-plugin").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "exec", "grafana-mongodb-control-plane", "ls", "/mnt/host/grafana-mongodb-community-plugin/integration-test/").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "exec", "grafana-mongodb-control-plane", "ls", "/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "exec", "grafana-mongodb-control-plane", "ls", "/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download/").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("docker", "exec", "grafana-mongodb-control-plane", "ls", "/mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download/transactions.json").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
+
+	gk8s.ClusterAction(clusterID, "Debugging", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+		return gosh.Command("ls", "/home/runner/work/grafana-mongodb-community-plugin/grafana-mongodb-community-plugin/e2e/..").WithStreams(gingk8s.GinkgoOutErr).Run()
+	}))
 
 	gk8s.Release(clusterID, &mongodb, mongodbInitID)
 
