@@ -14,7 +14,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/magefile/mage v1.13.0 // indirect
-	github.com/meln5674/gingk8s v0.0.0-20230527041642-8ea2982231b5
+	github.com/meln5674/gingk8s v0.0.0-20230529174508-736d83b6d346
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/onsi/biloba v0.1.5
 	github.com/onsi/ginkgo/v2 v2.9.5
