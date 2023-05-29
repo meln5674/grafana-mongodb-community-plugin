@@ -41,13 +41,13 @@ var _ = BeforeSuite(func(ctx context.Context) {
 
 	mongodbCertSecretID := gk8s.Manifests(clusterID, &mongodbCertSecret, mongodbInitID)
 
-	gk8s.Release(clusterID, &mongodb)
+	gk8s.Release(clusterID, &mongodb, mongodbInitID)
 
 	gk8s.Release(clusterID, &mongodbNoAuth)
 
-	gk8s.Release(clusterID, &mongodbTLS, mongodbInitID)
+	gk8s.Release(clusterID, &mongodbTLS, mongodbInitID, mongodbCertSecretID)
 
-	gk8s.Release(clusterID, &mongodbMTLS, mongodbCertSecretID)
+	gk8s.Release(clusterID, &mongodbMTLS, mongodbCertSecretID, mongodbCertSecretID)
 
 	grafanaResourcesID := gk8s.Manifests(clusterID, &grafanaResources, mongodbCertSecretID)
 
@@ -64,7 +64,7 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	gk8s.Release(clusterID, &grafana, grafanaDeps...)
 
 	gk8s.Options(gingk8s.SuiteOpts{
-		NoSuiteCleanup: true,
+		// NoSuiteCleanup: true,
 	})
 	gk8s.Setup(ctx)
 
