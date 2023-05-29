@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/chromedp/chromedp"
 	"github.com/meln5674/gingk8s"
@@ -41,10 +42,10 @@ var _ = BeforeSuite(func(ctx context.Context) {
 
 	mongodbCertSecretID := gk8s.Manifests(clusterID, &mongodbCertSecret, mongodbInitID)
 
-	// gk8s.ClusterAction(clusterID, "MongoDB Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb", RetryPeriod: 5 * time.Second})
-	// gk8s.ClusterAction(clusterID, "MongoDB (No Auth) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-no-auth", RetryPeriod: 5 * time.Second})
-	// gk8s.ClusterAction(clusterID, "MongoDB (TLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-tls", RetryPeriod: 5 * time.Second})
-	// gk8s.ClusterAction(clusterID, "MongoDB (mTLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-mtls", RetryPeriod: 5 * time.Second})
+	gk8s.ClusterAction(clusterID, "MongoDB Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb", RetryPeriod: 5 * time.Second})
+	gk8s.ClusterAction(clusterID, "MongoDB (No Auth) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-no-auth", RetryPeriod: 5 * time.Second})
+	gk8s.ClusterAction(clusterID, "MongoDB (TLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-tls", RetryPeriod: 5 * time.Second})
+	gk8s.ClusterAction(clusterID, "MongoDB (mTLS) Logs", &gingk8s.KubectlLogger{Kind: "sts", Name: "mongodb-mtls", RetryPeriod: 5 * time.Second})
 
 	gk8s.Release(clusterID, &mongodb, mongodbInitID)
 
