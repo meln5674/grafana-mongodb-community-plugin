@@ -285,8 +285,8 @@ github.com/mattn/go-runewidth v0.0.9 h1:Lm995f3rfxdpd6TSmuVCHVb/QhupuXlYr8sCI/Qd
 github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/meln5674/gingk8s v0.0.0-20230529174508-736d83b6d346 h1:h/aTycYEGMjVJCPn6An8L9hM1ELofILt+3u/6nbltJI=
-github.com/meln5674/gingk8s v0.0.0-20230529174508-736d83b6d346/go.mod h1:UsrRWSpsvLed6bFz1xBORkkVxUlIkIfaA6gzemuw3kE=
+github.com/meln5674/gingk8s v0.0.0-20230529200204-ba6881769af9 h1:Fsb4aar5/bLGFHtUE+cr+Ta5Oz2xyiK/6eRpugcCFRU=
+github.com/meln5674/gingk8s v0.0.0-20230529200204-ba6881769af9/go.mod h1:UsrRWSpsvLed6bFz1xBORkkVxUlIkIfaA6gzemuw3kE=
 github.com/meln5674/godag v0.2.0 h1:5n9az5FSbf1HpytU8EYqExM4RzUI30sNCmBXWv0Ohr8=
 github.com/meln5674/godag v0.2.0/go.mod h1:QMuZ8E+mtPYjoJkmkC/9rMgYNly0PE5ePRSz4ZgAOVI=
 github.com/meln5674/gosh v0.0.0-20230418002009-f731b8b62575 h1:ISvjhVD+W1vfvQO9Yy9ysGCxUhhxDG+l+Pmd1F0xJmc=
