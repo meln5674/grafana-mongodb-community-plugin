@@ -94,6 +94,7 @@ var _ = BeforeSuite(func(ctx context.Context) {
 
 	bopts := []chromedp.ExecAllocatorOption{
 		chromedp.ProxyServer("http://localhost:8080"),
+		chromedp.WindowSize(1920, 1080),
 	}
 
 	if os.Getenv("IT_IN_CONTAINER") != "" {
