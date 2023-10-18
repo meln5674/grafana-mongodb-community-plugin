@@ -464,7 +464,7 @@ func datasourcesYAML(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Clu
 
 func mongodbDatasets() gingk8s.NestedObject {
 	binaryData := gingk8s.Object{}
-	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh"} {
+	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh", "conversion_check.js"} {
 		binaryData[dataset] = func(dataset string) func() ([]byte, error) {
 			return func() ([]byte, error) {
 				return os.ReadFile(filepath.Join("../integration-test/datasets", dataset))
