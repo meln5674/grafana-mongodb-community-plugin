@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 
@@ -44,9 +43,9 @@ var _ = Describe("The plugin", func() {
 			b.Prepare()
 
 			b.Navigate("http://grafana.grafana-mongodb-it.cluster/datasources")
-			Eventually(datasource).Should(b.Exist())
+			Eventually(datasource, "15s").Should(b.Exist())
 			b.Click(datasource)
-			Eventually(preprovisionedAlert).Should(b.Exist())
+			Eventually(preprovisionedAlert, "15s").Should(b.Exist())
 		})
 	}
 
@@ -55,14 +54,7 @@ var _ = Describe("The plugin", func() {
 		"weather/timeseries-date",
 		"weather/table",
 		"tweets/timeseries",
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: func(*http.Request) (*url.URL, error) {
-				return url.Parse("http://localhost:8080")
-			},
-		},
+		"conversion_check/table",
 	}
 
 	for _, query := range queries {
@@ -75,7 +67,7 @@ var _ = Describe("The plugin", func() {
 			req.SetBasicAuth("admin", "adminPassword")
 			req.Header.Set("accept", "application/json, text/plain, */*")
 			req.Header.Set("content-type", "application/json")
-			resp, err := client.Do(req)
+			resp, err := clusterHTTPClient.Do(req)
 			Expect(err).ToNot(HaveOccurred())
 			_, err = io.Copy(GinkgoWriter, resp.Body)
 			Expect(err).ToNot(HaveOccurred())

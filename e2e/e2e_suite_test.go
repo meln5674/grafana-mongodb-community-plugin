@@ -6,6 +6,7 @@ import (
 	"hash/adler32"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/meln5674/gosh"
 	"github.com/onsi/biloba"
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/yaml"
 )
@@ -26,6 +28,7 @@ func TestE2e(t *testing.T) {
 
 var b *biloba.Biloba
 var gk8s *gingk8s.Gingk8s
+var clusterHTTPClient *http.Client
 
 var _ = BeforeSuite(func(ctx context.Context) {
 	f, err := os.Create("../integration-test/datasets/download/tweets.zip")
@@ -101,6 +104,20 @@ var _ = BeforeSuite(func(ctx context.Context) {
 		bopts = append(bopts, chromedp.NoSandbox)
 		GinkgoWriter.Printf("!!! WARNING: Sandbox disabled due to containerized environment detected from IT_IN_CONTAINER. This is insecure if this not actually a container!\n")
 	}
+
+	clusterHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			Proxy: func(*http.Request) (*url.URL, error) {
+				return url.Parse("http://localhost:8080")
+			},
+		},
+	}
+
+	Eventually(func(g gomega.Gomega) int {
+		resp, err := clusterHTTPClient.Get("http://grafana.grafana-mongodb-it.cluster/login")
+		g.Expect(err).ToNot(HaveOccurred())
+		return resp.StatusCode
+	}, "15s").Should(Equal(http.StatusOK))
 
 	biloba.SpinUpChrome(GinkgoT(), bopts...)
 	b = biloba.ConnectToChrome(GinkgoT())
