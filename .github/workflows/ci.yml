@@ -71,12 +71,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go
 
+      - name: Lint
+        id: lint
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn lint
+
 
       - name: Build Frontend
         id: build-frontend
         run: |
           export GOPATH=~/go
           ./build-env.sh yarn build
+
+      - name: Run Unit Tests
+        id: unit-tests
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn test-backend
 
       - name: Build Backend
         id: build-backend

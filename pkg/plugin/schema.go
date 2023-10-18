@@ -29,7 +29,7 @@ func (s *schemaInferenceState) updateField(name string, value interface{}) error
 	if _, ignored := s.ignored[name]; ignored {
 		return nil
 	}
-	_, guess, err := toGrafanaValue(value)
+	_, guess, err := ToGrafanaValue(value)
 	if err != nil {
 		return err
 	}

@@ -149,7 +149,7 @@ func (f *field) get(doc timestepDocument) interface{} {
 	return doc[f.Name]
 }
 
-func toGrafanaValue(value interface{}) (interface{}, data.FieldType, error) {
+func ToGrafanaValue(value interface{}) (interface{}, data.FieldType, error) {
 	// Only handles types explicitly referenced as being returned from bson.Unmarshal
 	// https://pkg.go.dev/go.mongodb.org/mongo-driver@v1.11.1/bson#hdr-Native_Go_Types
 	// notably, this does not deal with pointer types, like *float64
@@ -162,8 +162,38 @@ func toGrafanaValue(value interface{}) (interface{}, data.FieldType, error) {
 	// 1-5
 	case int32, int64, float64, string, bool:
 		return value, data.FieldTypeFor(value), nil
-	// 6-7
-	case bsonPrim.A, bsonPrim.D, bsonPrim.M, map[string]interface{}, []interface{}:
+		// 6-7
+	case bsonPrim.A:
+		// MarshalExtJSON doesn't accept arrays for whatever reason
+		// https://github.com/mongodb/mongo-go-driver/blob/v1/docs/common-issues.md#writexxx-can-only-write-while-positioned-on-a-element-or-value-but-is-positioned-on-a-toplevel
+		bytes, err := bson.MarshalExtJSON(bsonPrim.M{"Value": value}, false, false)
+		if err != nil {
+			return nil, data.FieldTypeUnknown, err
+		}
+
+		/*
+			// This is the "safe" but slow way,
+			// We have to do this dance where we marshal it to JSON, unmarshall it back,
+			// extract the data we want, and then re-marshal just that
+			var roundTrip struct{ Value interface{} }
+			err = json.Unmarshal(bytes, &roundTrip)
+			if err != nil {
+				return nil, data.FieldTypeUnknown, err
+			}
+			bytes, err = json.Marshal(roundTrip.Value)
+			if err != nil {
+				return nil, data.FieldTypeUnknown, err
+			}
+		*/
+
+		// This is the fast but dangerous way.
+		// In theory, it should never produce anything except {"Value":list_goes_here},
+		// so this should never fail, and it passes the test, but this isn't guaranteed
+		bytes = bytes[len([]byte(`{"Value":`)):]
+		bytes = bytes[:len(bytes)-len([]byte("}"))]
+
+		return json.RawMessage(bytes), data.FieldTypeJSON, err
+	case bsonPrim.D, bsonPrim.M, map[string]interface{}, []interface{}:
 		// map[string]interface{} and []interface{} aren't documented,
 		// but can be observed to be returned
 		bytes, err := bson.MarshalExtJSON(value, false, false)
@@ -215,7 +245,7 @@ func toGrafanaValue(value interface{}) (interface{}, data.FieldType, error) {
 }
 
 func convertValue(value interface{}, nullable bool) (interface{}, data.FieldType, error) {
-	converted, type_, err := toGrafanaValue(value)
+	converted, type_, err := ToGrafanaValue(value)
 	if err != nil {
 		return nil, type_, err
 	}
