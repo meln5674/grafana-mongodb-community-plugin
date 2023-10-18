@@ -91,7 +91,8 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	gk8s.Release(clusterID, &grafana, grafanaDeps...)
 
 	gk8s.Options(gingk8s.SuiteOpts{
-		// NoSuiteCleanup: true,
+		NoSuiteCleanup: os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
+		NoSpecCleanup:  os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
 	})
 	gk8s.Setup(ctx)
 
@@ -136,7 +137,7 @@ var _ = BeforeSuite(func(ctx context.Context) {
 })
 
 var (
-	devMode = false // TODO get this from a env var
+	devMode = os.Getenv("INTEGRATION_TEST_DEV_MODE") != ""
 )
 
 var (
@@ -395,10 +396,10 @@ var (
 	}
 
 	grafanaDevModeSetExtra = gingk8s.Object{
-		"extraVolumes[0].name":           "plugin",
-		"extraVolumes[0].hostPath.path":  "/mnt/host/grafana-mongodb-community-plugin/",
-		"extraVolumeMounts[0].name":      "plugin",
-		"extraVolumeMounts[0].mountPath": "/opt/bitnami/grafana/data/plugins/meln5674-mongodb-community",
+		"grafana.extraVolumes[0].name":           "plugin",
+		"grafana.extraVolumes[0].hostPath.path":  "/mnt/host/grafana-mongodb-community-plugin/",
+		"grafana.extraVolumeMounts[0].name":      "plugin",
+		"grafana.extraVolumeMounts[0].mountPath": "/opt/bitnami/grafana/data/plugins/meln5674-mongodb-community",
 	}
 
 	grafanaNonDevModeSetExtra = gingk8s.Object{
