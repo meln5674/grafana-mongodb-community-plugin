@@ -25,7 +25,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	bsonPrim "go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	mongoOpts "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -543,9 +542,9 @@ type datasource struct {
 	secureJsonData
 }
 
-func (d *datasource) getAuth() (*options.Credential, error) {
+func (d *datasource) applyAuth(uri *url.URL) error {
 	if d.Username == "" {
-		return nil, nil
+		return nil
 	}
 	/*if d.Password != "" {
 		mongoURL.User = url.UserPassword(d.Username, d.Password)
@@ -553,10 +552,9 @@ func (d *datasource) getAuth() (*options.Credential, error) {
 		mongoURL.User = url.User(d.Username)
 	}*/
 
-	return &options.Credential{
-		Username: d.Username,
-		Password: d.Password,
-	}, nil
+	uri.User = url.UserPassword(d.Username, d.Password)
+
+	return nil
 }
 
 func (d *datasource) getTLS() (*tls.Config, error) {
@@ -610,14 +608,12 @@ func connect(ctx context.Context, pCtx backend.PluginContext) (client *mongo.Cli
 		return nil, errors.Wrap(err, fmt.Sprintf("Invalid Datasource URL %s", data.URL)), nil
 	}
 
-	opts = opts.ApplyURI(mongoURL.String())
-	credential, err := data.getAuth()
+	err = data.applyAuth(mongoURL)
 	if err != nil {
 		return nil, err, nil
 	}
-	if credential != nil {
-		opts.SetAuth(*credential)
-	}
+	opts = opts.ApplyURI(mongoURL.String())
+
 	tlsConfig, err := data.getTLS()
 	if err != nil {
 		return nil, err, nil

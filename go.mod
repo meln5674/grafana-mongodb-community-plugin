@@ -15,6 +15,7 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/magefile/mage v1.13.0 // indirect
 	github.com/meln5674/gingk8s v0.0.0-20230529200204-ba6881769af9
+	github.com/meln5674/gosh v0.0.0-20230418002009-f731b8b62575
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/onsi/biloba v0.1.5
 	github.com/onsi/ginkgo/v2 v2.9.5
