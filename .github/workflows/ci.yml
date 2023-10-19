@@ -116,8 +116,8 @@ jobs:
         if: contains(github.ref, 'tags/v')
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ github.ref }}"
+          # automatic_release_tag: "${{ github.ref }}"
           prerelease: true
-          title: "${{ github.ref }}"
+          title: "${{ github.tag }}"
           files: |
             meln5674-mongodb-community.zip
