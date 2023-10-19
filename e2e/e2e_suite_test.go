@@ -285,10 +285,16 @@ var (
 	}
 
 	mongodbChart = gingk8s.HelmChart{
-		RemoteChartInfo: gingk8s.RemoteChartInfo{
-			Name:    "mongodb",
-			Repo:    &bitnamiRepo,
-			Version: "13.6.2",
+		/*
+			RemoteChartInfo: gingk8s.RemoteChartInfo{
+				Name:    "mongodb",
+				Repo:    &bitnamiRepo,
+				Version: "13.18.1",
+			}
+		*/
+		LocalChartInfo: gingk8s.LocalChartInfo{
+			Path: "../integration-test/bitnami-charts/bitnami/mongodb/",
+			// DependencyUpdate: true,
 		},
 	}
 
