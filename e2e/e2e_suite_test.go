@@ -26,9 +26,19 @@ func TestE2e(t *testing.T) {
 	RunSpecs(t, "E2e Suite")
 }
 
-var b *biloba.Biloba
-var gk8s *gingk8s.Gingk8s
-var clusterHTTPClient *http.Client
+var (
+	b        *biloba.Biloba
+	gk8s     *gingk8s.Gingk8s
+	gk8sOpts = gingk8s.SuiteOpts{
+		NoSuiteCleanup: os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
+		NoSpecCleanup:  os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
+	}
+	clusterHTTPClient *http.Client
+)
+
+var (
+	devMode = os.Getenv("INTEGRATION_TEST_DEV_MODE") != ""
+)
 
 var _ = BeforeSuite(func(ctx context.Context) {
 	f, err := os.Create("../integration-test/datasets/download/tweets.zip")
@@ -88,12 +98,17 @@ var _ = BeforeSuite(func(ctx context.Context) {
 
 	gk8s.Release(clusterID, &kubeIngressProxy, ingressNginxID, kubeIngressProxyImageID)
 
-	gk8s.Release(clusterID, &grafana, grafanaDeps...)
+	grafanaID := gk8s.Release(clusterID, &grafana, grafanaDeps...)
 
-	gk8s.Options(gingk8s.SuiteOpts{
-		NoSuiteCleanup: os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
-		NoSpecCleanup:  os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
-	})
+	if devMode {
+		gk8s.ClusterAction(clusterID, "Restart Grafana", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+			Expect(g.Kubectl(ctx, cluster, "rollout", "restart", "deploy/grafana").Run()).To(Succeed())
+			Expect(g.Kubectl(ctx, cluster, "rollout", "status", "deploy/grafana").Run()).To(Succeed())
+			return nil
+		}), grafanaID)
+	}
+
+	gk8s.Options(gk8sOpts)
 	gk8s.Setup(ctx)
 
 	bopts := []chromedp.ExecAllocatorOption{
@@ -120,6 +135,12 @@ var _ = BeforeSuite(func(ctx context.Context) {
 		return resp.StatusCode
 	}, "15s").Should(Equal(http.StatusOK))
 
+	Consistently(func(g gomega.Gomega) int {
+		resp, err := clusterHTTPClient.Get("http://grafana.grafana-mongodb-it.cluster/login")
+		g.Expect(err).ToNot(HaveOccurred())
+		return resp.StatusCode
+	}, "15s").Should(Equal(http.StatusOK))
+
 	biloba.SpinUpChrome(GinkgoT(), bopts...)
 	b = biloba.ConnectToChrome(GinkgoT())
 
@@ -135,10 +156,6 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	b.Click(`button[aria-label="Login button"]`)
 	Eventually(b.Location, "15s").Should(Equal("http://grafana.grafana-mongodb-it.cluster/?orgId=1"))
 })
-
-var (
-	devMode = os.Getenv("INTEGRATION_TEST_DEV_MODE") != ""
-)
 
 var (
 	cluster = gingk8s.KindCluster{
@@ -393,12 +410,12 @@ var (
 			Expect(err).ToNot(HaveOccurred())
 			return fmt.Sprintf("%d", adler32.Checksum(pluginBytes))
 		},
-		"extraEnvVars[0].name":     "GF_DEFAULT_APP_MODE",
-		"extraEnvVars[0].value":    "development",
-		"updateStrategy.type":      "Recreate",
-		"ingress.enabled":          true,
-		"ingress.hostname":         "grafana.grafana-mongodb-it.cluster",
-		"ingress.ingressClassName": "nginx",
+		"extraEnvVars[0].name":        "GF_DEFAULT_APP_MODE",
+		"extraEnvVars[0].value":       "development",
+		"grafana.updateStrategy.type": "Recreate",
+		"ingress.enabled":             true,
+		"ingress.hostname":            "grafana.grafana-mongodb-it.cluster",
+		"ingress.ingressClassName":    "nginx",
 	}
 
 	grafanaDevModeSetExtra = gingk8s.Object{
@@ -473,10 +490,10 @@ func datasourcesYAML(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Clu
 	cert := g.KubectlReturnSecretValue(ctx, cluster, "mongodb-mtls-client", "tls.crt")
 	key := g.KubectlReturnSecretValue(ctx, cluster, "mongodb-mtls-client", "tls.key")
 
-	mTLSSource := datasources["datasources"].([]interface{})[2].(map[string]interface{})
+	mTLSSource := datasources["datasources"].([]interface{})[3].(map[string]interface{})
 	mTLSSourceData := mTLSSource["jsonData"].(map[string]interface{})
 	mTLSSourceSecureData := mTLSSource["secureJsonData"].(map[string]interface{})
-	tlsSource := datasources["datasources"].([]interface{})[3].(map[string]interface{})
+	tlsSource := datasources["datasources"].([]interface{})[4].(map[string]interface{})
 	tlsSourceData := tlsSource["jsonData"].(map[string]interface{})
 
 	tlsSourceData["tlsCa"] = ca
@@ -488,7 +505,7 @@ func datasourcesYAML(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Clu
 
 func mongodbDatasets() gingk8s.NestedObject {
 	binaryData := gingk8s.Object{}
-	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh", "conversion_check.js"} {
+	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh", "conversion_check.js", "non_default_auth_source.js"} {
 		binaryData[dataset] = func(dataset string) func() ([]byte, error) {
 			return func() ([]byte, error) {
 				return os.ReadFile(filepath.Join("../integration-test/datasets", dataset))
