@@ -168,6 +168,13 @@ export class QueryEditor extends PureComponent<Props> {
     onRunQuery();
   };
 
+  onAutoTimeBoundAtStartChange = (event: SyntheticEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    onChange({ ...query, autoTimeBoundAtStart: event.currentTarget.checked });
+    // executes the query
+    onRunQuery();
+  };
+
   onAutoTimeSortChange = (event: SyntheticEvent<HTMLInputElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     onChange({ ...query, autoTimeSort: event.currentTarget.checked });
@@ -292,13 +299,25 @@ export class QueryEditor extends PureComponent<Props> {
               <InlineField
                   label="Automatic Time-Bound"
                   labelWidth={this.labelWidth}
-                  tooltip="Add a stage at the beginning to $match documents where Timestamp Field is within the current dashboard time range"
+                  tooltip="Add a stage at the end of your pipeline to $match documents where Timestamp Field is within the current dashboard time range"
                   >
                 <InlineSwitch
                   value={query.autoTimeBound || false}
                   onChange={this.onAutoTimeBoundChange}
                 ></InlineSwitch>
               </InlineField>
+              { query.autoTimeBound ? (
+                <InlineField
+                    label="Time-Bound at Start"
+                    labelWidth={this.labelWidth}
+                    tooltip="Instead add the automatic time bound $match stage at the beginning of your pipeline. This only works if your timestamp field is present and correctly formatted in your collection, but can improve performance by not processing records outside of the current time range"
+                    >
+                  <InlineSwitch
+                    value={query.autoTimeBoundAtStart || false}
+                    onChange={this.onAutoTimeBoundAtStartChange}
+                  ></InlineSwitch>
+                </InlineField>     
+              ) : false }
               <InlineField
                   label="Automatic Time-Sort"
                   labelWidth={this.labelWidth}

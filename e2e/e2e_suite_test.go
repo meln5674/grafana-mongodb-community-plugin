@@ -1,7 +1,9 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"io"
@@ -10,6 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/meln5674/grafana-mongodb-community-plugin/pkg/plugin"
 
 	"github.com/chromedp/chromedp"
 	"github.com/meln5674/gingk8s"
@@ -111,16 +116,6 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	gk8s.Options(gk8sOpts)
 	gk8s.Setup(ctx)
 
-	bopts := []chromedp.ExecAllocatorOption{
-		chromedp.ProxyServer("http://localhost:8080"),
-		chromedp.WindowSize(1920, 1080),
-	}
-
-	if os.Getenv("IT_IN_CONTAINER") != "" {
-		bopts = append(bopts, chromedp.NoSandbox)
-		GinkgoWriter.Printf("!!! WARNING: Sandbox disabled due to containerized environment detected from IT_IN_CONTAINER. This is insecure if this not actually a container!\n")
-	}
-
 	clusterHTTPClient = &http.Client{
 		Transport: &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
@@ -140,6 +135,16 @@ var _ = BeforeSuite(func(ctx context.Context) {
 		g.Expect(err).ToNot(HaveOccurred())
 		return resp.StatusCode
 	}, "15s").Should(Equal(http.StatusOK))
+
+	bopts := []chromedp.ExecAllocatorOption{
+		chromedp.ProxyServer("http://localhost:8080"),
+		chromedp.WindowSize(1920, 1080),
+	}
+
+	if os.Getenv("IT_IN_CONTAINER") != "" {
+		bopts = append(bopts, chromedp.NoSandbox)
+		GinkgoWriter.Printf("!!! WARNING: Sandbox disabled due to containerized environment detected from IT_IN_CONTAINER. This is insecure if this not actually a container!\n")
+	}
 
 	biloba.SpinUpChrome(GinkgoT(), bopts...)
 	b = biloba.ConnectToChrome(GinkgoT())
@@ -470,6 +475,23 @@ var (
 		Name:  "grafana",
 		Ports: []string{"3000:3000"},
 	}
+
+	queryNames = []string{
+		"weather/timeseries",
+		"weather/timeseries-date",
+		"weather/table",
+
+		"tweets/table-inference",
+		"tweets/timeseries-auto-time-bound-end",
+		"tweets/timeseries-auto-time-bound-start",
+		"tweets/timeseries-auto-time-sort-time-bound-end",
+		"tweets/timeseries-auto-time-sort-time-bound-start",
+		"tweets/timeseries",
+
+		"conversion_check/table",
+	}
+
+	queries []NamedGrafanaQueryRequest
 )
 
 func grafanaSet(devMode bool) gingk8s.Object {
@@ -513,4 +535,81 @@ func mongodbDatasets() gingk8s.NestedObject {
 		}(dataset)
 	}
 	return gingk8s.ConfigMap("mongodb-init", "", nil, binaryData)
+}
+
+type GrafanaQuery struct {
+	RefID         string            `json:"refId"`
+	MaxDataPoints int64             `json:"maxDataPoints"`
+	Interval      int64             `json:"intervalMs"`
+	TimeRange     TimeRange         `json:"timeRange"`
+	Key           string            `json:"key"`
+	DatasourceID  int               `json:"datasourceId"`
+	Datasource    GrafanaDatasource `json:"datasource"`
+	plugin.QueryModel
+}
+
+type GrafanaDatasource struct {
+	UID  string `json:"uid"`
+	Type string `json:"type"`
+}
+
+type TimeRange struct {
+	RawTimeRange
+	Raw RawTimeRange `json:"raw"`
+}
+
+type RawTimeRange struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
+type GrafanaQueryRequest struct {
+	Queries   []GrafanaQuery `json:"queries"`
+	TimeRange TimeRange      `json:"timeRange"`
+	Raw       TimeRange      `json:"raw"`
+	From      string         `json:"from"`
+	To        string         `json:"to"`
+}
+
+type NamedGrafanaQueryRequest struct {
+	Name string
+	Body GrafanaQueryRequest
+}
+
+func (n *NamedGrafanaQueryRequest) Reader() io.Reader {
+	return &JsonReader{Value: &n.Body}
+}
+
+type JsonReader struct {
+	Value interface{}
+	buf   *bytes.Buffer
+}
+
+func (j *JsonReader) Read(b []byte) (int, error) {
+	if j.buf == nil {
+		jsonBytes, err := json.Marshal(j.Value)
+		if err != nil {
+			return 0, err
+		}
+		j.buf = bytes.NewBuffer(jsonBytes)
+	}
+	if j.buf == nil {
+		panic("???")
+	}
+	return j.buf.Read(b)
+}
+
+func init() {
+	queries = make([]NamedGrafanaQueryRequest, len(queryNames))
+	for ix, name := range queryNames {
+		queries[ix].Name = name
+		f, err := os.Open(filepath.Join("../integration-test/queries", name+".json"))
+		if err != nil {
+			panic(err)
+		}
+		err = json.NewDecoder(f).Decode(&queries[ix].Body)
+		if err != nil {
+			panic(err)
+		}
+	}
 }

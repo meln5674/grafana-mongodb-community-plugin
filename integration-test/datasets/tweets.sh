@@ -15,3 +15,12 @@ fi
 mongorestore \
     "${ARGS[@]}" \
     /mnt/host/grafana-mongodb-community-plugin/integration-test/datasets/download/tweets/dump/
+
+if [ "${ALLOW_EMPTY_PASSWORD}" != "yes" ]; then
+    ARGS+=( --authenticationDatabase admin )
+fi
+# The timestamp string format is not understandable by mongo, so we strip the first 4 chars to
+# get a format that does actually work
+mongosh "${ARGS[@]}" \
+    localhost:27017/twitter \
+    --eval 'db.tweets.updateMany({}, [{ "$set": { "created_at": {"$substr": ["$created_at", 4, -1]}}}])'

@@ -1,13 +1,10 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
@@ -69,14 +66,6 @@ var _ = Describe("The plugin", func() {
 		},
 	}
 
-	queries := []string{
-		"weather/timeseries",
-		"weather/timeseries-date",
-		"weather/table",
-		"tweets/timeseries",
-		"conversion_check/table",
-	}
-
 	for _, datasource := range datasources {
 		datasource := datasource
 		Describe("on the ui", func() {
@@ -92,25 +81,28 @@ var _ = Describe("The plugin", func() {
 
 		for _, query := range queries {
 			query := query
-			It(fmt.Sprintf("should execute the %s query against the %s datasource", query, datasource.name), func() {
+			It(fmt.Sprintf("should execute the %s query against the %s datasource", query.Name, datasource.name), func() {
 				datasource := datasource
 
-				queryBytes, err := os.ReadFile(filepath.Join("../integration-test/queries", query+".json"))
+				for ix := range query.Body.Queries {
+					query.Body.Queries[ix].DatasourceID = datasource.id
+					query.Body.Queries[ix].Datasource.UID = datasource.uid
+				}
+				queryBytes, err := io.ReadAll(query.Reader())
 				Expect(err).ToNot(HaveOccurred())
-				// TODO: Do this w/ json instead of string replacement
-				queryBytes = bytes.ReplaceAll(queryBytes, []byte(`"datasourceId":1`), []byte(fmt.Sprintf(`"datasourceId":%d`, datasource.id)))
-				queryBytes = bytes.ReplaceAll(queryBytes, []byte(`"uid":"P1CC9A79BDAF09793"`), []byte(fmt.Sprintf(`"uid":"%s"`, datasource.uid)))
-				GinkgoWriter.Printf("Executing query %s", string(queryBytes))
+				GinkgoWriter.Printf("Executing query %s\n", string(queryBytes))
 
-				req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ds/query", bytes.NewBuffer(queryBytes))
+				req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ds/query", query.Reader())
 				Expect(err).ToNot(HaveOccurred())
 				req.SetBasicAuth("admin", "adminPassword")
 				req.Header.Set("accept", "application/json, text/plain, */*")
 				req.Header.Set("content-type", "application/json")
 				resp, err := clusterHTTPClient.Do(req)
 				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Print("Got response ")
 				_, err = io.Copy(GinkgoWriter, resp.Body)
 				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("")
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			})
 		}

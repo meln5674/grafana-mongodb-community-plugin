@@ -11,6 +11,7 @@ export interface MongoDBQuery extends DataQuery {
   valueFieldTypes: string[];
   aggregation: string;
   autoTimeBound: boolean;
+  autoTimeBoundAtStart: boolean;
   autoTimeSort: boolean;
   schemaInference: boolean;
   schemaInferenceDepth: number;

@@ -7,9 +7,10 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/grafana/grafana-starter-datasource-backend/pkg/plugin"
 	"go.mongodb.org/mongo-driver/bson"
 	bsonprim "go.mongodb.org/mongo-driver/bson/primitive"
+
+	"github.com/meln5674/grafana-mongodb-community-plugin/pkg/plugin"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

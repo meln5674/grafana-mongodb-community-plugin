@@ -1,4 +1,4 @@
-module github.com/grafana/grafana-starter-datasource-backend
+module github.com/meln5674/grafana-mongodb-community-plugin
 
 go 1.16
 
