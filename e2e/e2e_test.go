@@ -140,7 +140,7 @@ var _ = Describe("The plugin", func() {
 		Expect(err).ToNot(HaveOccurred())
 		_, err = io.Copy(GinkgoWriter, resp.Body)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusAccepted))
 	})
 	It(fmt.Sprintf("should execute the alerts evaluation query"), func() {
 		req, err := http.NewRequest(http.MethodGet, "http://grafana.grafana-mongodb-it.cluster/api/prometheus/grafana/api/v1/rules", nil)
