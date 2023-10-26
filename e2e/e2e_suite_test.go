@@ -1,20 +1,27 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/meln5674/grafana-mongodb-community-plugin/pkg/plugin"
 
 	"github.com/chromedp/chromedp"
 	"github.com/meln5674/gingk8s"
 	"github.com/meln5674/gosh"
 	"github.com/onsi/biloba"
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/yaml"
 )
@@ -24,8 +31,19 @@ func TestE2e(t *testing.T) {
 	RunSpecs(t, "E2e Suite")
 }
 
-var b *biloba.Biloba
-var gk8s *gingk8s.Gingk8s
+var (
+	b        *biloba.Biloba
+	gk8s     *gingk8s.Gingk8s
+	gk8sOpts = gingk8s.SuiteOpts{
+		NoSuiteCleanup: os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
+		NoSpecCleanup:  os.Getenv("INTEGRATION_TEST_NO_CLEANUP") != "",
+	}
+	clusterHTTPClient *http.Client
+)
+
+var (
+	devMode = os.Getenv("INTEGRATION_TEST_DEV_MODE") != ""
+)
 
 var _ = BeforeSuite(func(ctx context.Context) {
 	f, err := os.Create("../integration-test/datasets/download/tweets.zip")
@@ -85,12 +103,38 @@ var _ = BeforeSuite(func(ctx context.Context) {
 
 	gk8s.Release(clusterID, &kubeIngressProxy, ingressNginxID, kubeIngressProxyImageID)
 
-	gk8s.Release(clusterID, &grafana, grafanaDeps...)
+	grafanaID := gk8s.Release(clusterID, &grafana, grafanaDeps...)
 
-	gk8s.Options(gingk8s.SuiteOpts{
-		// NoSuiteCleanup: true,
-	})
+	if devMode {
+		gk8s.ClusterAction(clusterID, "Restart Grafana", gingk8s.ClusterAction(func(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Cluster) error {
+			Expect(g.Kubectl(ctx, cluster, "rollout", "restart", "deploy/grafana").Run()).To(Succeed())
+			Expect(g.Kubectl(ctx, cluster, "rollout", "status", "deploy/grafana").Run()).To(Succeed())
+			return nil
+		}), grafanaID)
+	}
+
+	gk8s.Options(gk8sOpts)
 	gk8s.Setup(ctx)
+
+	clusterHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			Proxy: func(*http.Request) (*url.URL, error) {
+				return url.Parse("http://localhost:8080")
+			},
+		},
+	}
+
+	Eventually(func(g gomega.Gomega) int {
+		resp, err := clusterHTTPClient.Get("http://grafana.grafana-mongodb-it.cluster/login")
+		g.Expect(err).ToNot(HaveOccurred())
+		return resp.StatusCode
+	}, "15s").Should(Equal(http.StatusOK))
+
+	Consistently(func(g gomega.Gomega) int {
+		resp, err := clusterHTTPClient.Get("http://grafana.grafana-mongodb-it.cluster/login")
+		g.Expect(err).ToNot(HaveOccurred())
+		return resp.StatusCode
+	}, "15s").Should(Equal(http.StatusOK))
 
 	bopts := []chromedp.ExecAllocatorOption{
 		chromedp.ProxyServer("http://localhost:8080"),
@@ -117,10 +161,6 @@ var _ = BeforeSuite(func(ctx context.Context) {
 	b.Click(`button[aria-label="Login button"]`)
 	Eventually(b.Location, "15s").Should(Equal("http://grafana.grafana-mongodb-it.cluster/?orgId=1"))
 })
-
-var (
-	devMode = false // TODO get this from a env var
-)
 
 var (
 	cluster = gingk8s.KindCluster{
@@ -267,10 +307,16 @@ var (
 	}
 
 	mongodbChart = gingk8s.HelmChart{
-		RemoteChartInfo: gingk8s.RemoteChartInfo{
-			Name:    "mongodb",
-			Repo:    &bitnamiRepo,
-			Version: "13.6.2",
+		/*
+			RemoteChartInfo: gingk8s.RemoteChartInfo{
+				Name:    "mongodb",
+				Repo:    &bitnamiRepo,
+				Version: "13.18.1",
+			}
+		*/
+		LocalChartInfo: gingk8s.LocalChartInfo{
+			Path: "../integration-test/bitnami-charts/bitnami/mongodb/",
+			// DependencyUpdate: true,
 		},
 	}
 
@@ -369,19 +415,19 @@ var (
 			Expect(err).ToNot(HaveOccurred())
 			return fmt.Sprintf("%d", adler32.Checksum(pluginBytes))
 		},
-		"extraEnvVars[0].name":     "GF_DEFAULT_APP_MODE",
-		"extraEnvVars[0].value":    "development",
-		"updateStrategy.type":      "Recreate",
-		"ingress.enabled":          true,
-		"ingress.hostname":         "grafana.grafana-mongodb-it.cluster",
-		"ingress.ingressClassName": "nginx",
+		"extraEnvVars[0].name":        "GF_DEFAULT_APP_MODE",
+		"extraEnvVars[0].value":       "development",
+		"grafana.updateStrategy.type": "Recreate",
+		"ingress.enabled":             true,
+		"ingress.hostname":            "grafana.grafana-mongodb-it.cluster",
+		"ingress.ingressClassName":    "nginx",
 	}
 
 	grafanaDevModeSetExtra = gingk8s.Object{
-		"extraVolumes[0].name":           "plugin",
-		"extraVolumes[0].hostPath.path":  "/mnt/host/grafana-mongodb-community-plugin/",
-		"extraVolumeMounts[0].name":      "plugin",
-		"extraVolumeMounts[0].mountPath": "/opt/bitnami/grafana/data/plugins/meln5674-mongodb-community",
+		"grafana.extraVolumes[0].name":           "plugin",
+		"grafana.extraVolumes[0].hostPath.path":  "/mnt/host/grafana-mongodb-community-plugin/",
+		"grafana.extraVolumeMounts[0].name":      "plugin",
+		"grafana.extraVolumeMounts[0].mountPath": "/opt/bitnami/grafana/data/plugins/meln5674-mongodb-community",
 	}
 
 	grafanaNonDevModeSetExtra = gingk8s.Object{
@@ -429,6 +475,23 @@ var (
 		Name:  "grafana",
 		Ports: []string{"3000:3000"},
 	}
+
+	queryNames = []string{
+		"weather/timeseries",
+		"weather/timeseries-date",
+		"weather/table",
+
+		"tweets/table-inference",
+		"tweets/timeseries-auto-time-bound-end",
+		"tweets/timeseries-auto-time-bound-start",
+		"tweets/timeseries-auto-time-sort-time-bound-end",
+		"tweets/timeseries-auto-time-sort-time-bound-start",
+		"tweets/timeseries",
+
+		"conversion_check/table",
+	}
+
+	queries []NamedGrafanaQueryRequest
 )
 
 func grafanaSet(devMode bool) gingk8s.Object {
@@ -449,10 +512,10 @@ func datasourcesYAML(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Clu
 	cert := g.KubectlReturnSecretValue(ctx, cluster, "mongodb-mtls-client", "tls.crt")
 	key := g.KubectlReturnSecretValue(ctx, cluster, "mongodb-mtls-client", "tls.key")
 
-	mTLSSource := datasources["datasources"].([]interface{})[2].(map[string]interface{})
+	mTLSSource := datasources["datasources"].([]interface{})[3].(map[string]interface{})
 	mTLSSourceData := mTLSSource["jsonData"].(map[string]interface{})
 	mTLSSourceSecureData := mTLSSource["secureJsonData"].(map[string]interface{})
-	tlsSource := datasources["datasources"].([]interface{})[3].(map[string]interface{})
+	tlsSource := datasources["datasources"].([]interface{})[4].(map[string]interface{})
 	tlsSourceData := tlsSource["jsonData"].(map[string]interface{})
 
 	tlsSourceData["tlsCa"] = ca
@@ -464,7 +527,7 @@ func datasourcesYAML(g gingk8s.Gingk8s, ctx context.Context, cluster gingk8s.Clu
 
 func mongodbDatasets() gingk8s.NestedObject {
 	binaryData := gingk8s.Object{}
-	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh"} {
+	for _, dataset := range []string{"weather.js", "tweets.sh", "transactions.sh", "conversion_check.js", "non_default_auth_source.js"} {
 		binaryData[dataset] = func(dataset string) func() ([]byte, error) {
 			return func() ([]byte, error) {
 				return os.ReadFile(filepath.Join("../integration-test/datasets", dataset))
@@ -472,4 +535,81 @@ func mongodbDatasets() gingk8s.NestedObject {
 		}(dataset)
 	}
 	return gingk8s.ConfigMap("mongodb-init", "", nil, binaryData)
+}
+
+type GrafanaQuery struct {
+	RefID         string            `json:"refId"`
+	MaxDataPoints int64             `json:"maxDataPoints"`
+	Interval      int64             `json:"intervalMs"`
+	TimeRange     TimeRange         `json:"timeRange"`
+	Key           string            `json:"key"`
+	DatasourceID  int               `json:"datasourceId"`
+	Datasource    GrafanaDatasource `json:"datasource"`
+	plugin.QueryModel
+}
+
+type GrafanaDatasource struct {
+	UID  string `json:"uid"`
+	Type string `json:"type"`
+}
+
+type TimeRange struct {
+	RawTimeRange
+	Raw RawTimeRange `json:"raw"`
+}
+
+type RawTimeRange struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
+type GrafanaQueryRequest struct {
+	Queries   []GrafanaQuery `json:"queries"`
+	TimeRange TimeRange      `json:"timeRange"`
+	Raw       TimeRange      `json:"raw"`
+	From      string         `json:"from"`
+	To        string         `json:"to"`
+}
+
+type NamedGrafanaQueryRequest struct {
+	Name string
+	Body GrafanaQueryRequest
+}
+
+func (n *NamedGrafanaQueryRequest) Reader() io.Reader {
+	return &JsonReader{Value: &n.Body}
+}
+
+type JsonReader struct {
+	Value interface{}
+	buf   *bytes.Buffer
+}
+
+func (j *JsonReader) Read(b []byte) (int, error) {
+	if j.buf == nil {
+		jsonBytes, err := json.Marshal(j.Value)
+		if err != nil {
+			return 0, err
+		}
+		j.buf = bytes.NewBuffer(jsonBytes)
+	}
+	if j.buf == nil {
+		panic("???")
+	}
+	return j.buf.Read(b)
+}
+
+func init() {
+	queries = make([]NamedGrafanaQueryRequest, len(queryNames))
+	for ix, name := range queryNames {
+		queries[ix].Name = name
+		f, err := os.Open(filepath.Join("../integration-test/queries", name+".json"))
+		if err != nil {
+			panic(err)
+		}
+		err = json.NewDecoder(f).Decode(&queries[ix].Body)
+		if err != nil {
+			panic(err)
+		}
+	}
 }

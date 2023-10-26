@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"os"
-	"path/filepath"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
@@ -19,68 +16,96 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type datasourceInfo struct {
+	name       string
+	id         int
+	uid        string
+	uiSelector string
+}
+
 var _ = Describe("The plugin", func() {
 
 	datasourceTable := `div[class$="-page-content"] ul`
-	mongodbDatasource := datasourceTable + ` > li:nth-child(1) > div > h2 > a`
-	mongodbMTLSDatasource := datasourceTable + ` > li:nth-child(2) > div > h2 > a`
-	mongodbNoAuthDatasource := datasourceTable + ` > li:nth-child(3) > div > h2 > a`
-	mongodbTLSDatasource := datasourceTable + ` > li:nth-child(4) > div > h2 > a`
-	mongodbTLSInsecureDatasource := datasourceTable + ` > li:nth-child(5) > div > h2 > a`
-
 	preprovisionedAlert := `div[data-testid="data-testid Alert info"]`
-
-	datasourceTests := map[string]string{
-		"plaintext":         mongodbDatasource,
-		"mTLS":              mongodbMTLSDatasource,
-		"no authentication": mongodbNoAuthDatasource,
-		"TLS":               mongodbTLSDatasource,
-		"insecure TLS":      mongodbTLSInsecureDatasource,
-	}
-
-	for desc, datasource := range datasourceTests {
-		It(fmt.Sprintf("should load a pre-provisioned %s datasource", desc), func() {
-
-			b.Prepare()
-
-			b.Navigate("http://grafana.grafana-mongodb-it.cluster/datasources")
-			Eventually(datasource).Should(b.Exist())
-			b.Click(datasource)
-			Eventually(preprovisionedAlert).Should(b.Exist())
-		})
-	}
-
-	queries := []string{
-		"weather/timeseries",
-		"weather/timeseries-date",
-		"weather/table",
-		"tweets/timeseries",
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: func(*http.Request) (*url.URL, error) {
-				return url.Parse("http://localhost:8080")
-			},
+	datasources := []datasourceInfo{
+		{
+			name:       "mongodb",
+			id:         1,
+			uid:        "P1CC9A79BDAF09793",
+			uiSelector: datasourceTable + ` > li:nth-child(1) > div > h2 > a`,
+		},
+		{
+			name:       "mongodb-mlts",
+			id:         4,
+			uid:        "P2CE72B00BA39C90B",
+			uiSelector: datasourceTable + ` > li:nth-child(2) > div > h2 > a`,
+		},
+		{
+			name:       "mongodb-no-auth",
+			id:         3,
+			uid:        "P37BB7E38C06C68DF",
+			uiSelector: datasourceTable + ` > li:nth-child(3) > div > h2 > a`,
+		},
+		{
+			name:       "mongodb-non-default-auth-source",
+			id:         2,
+			uid:        "P96F3DFDC70C53703",
+			uiSelector: datasourceTable + ` > li:nth-child(4) > div > h2 > a`,
+		},
+		{
+			name:       "mongodb-tls",
+			id:         5,
+			uid:        "P5C7DC0BAB25D7937",
+			uiSelector: datasourceTable + ` > li:nth-child(5) > div > h2 > a`,
+		},
+		{
+			name:       "mongodb-tls-insecure",
+			id:         6,
+			uid:        "P50072D096AA1FAA5",
+			uiSelector: datasourceTable + ` > li:nth-child(5) > div > h2 > a`,
 		},
 	}
 
-	for _, query := range queries {
-		It(fmt.Sprintf("should execute the %s query", query), func() {
-			f, err := os.Open(filepath.Join("../integration-test/queries", query+".json"))
-			Expect(err).ToNot(HaveOccurred())
+	for _, datasource := range datasources {
+		datasource := datasource
+		Describe("on the ui", func() {
+			It(fmt.Sprintf("should load a pre-provisioned %s datasource on the UI", datasource.name), func() {
+				b.Prepare()
 
-			req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ds/query", f)
-			Expect(err).ToNot(HaveOccurred())
-			req.SetBasicAuth("admin", "adminPassword")
-			req.Header.Set("accept", "application/json, text/plain, */*")
-			req.Header.Set("content-type", "application/json")
-			resp, err := client.Do(req)
-			Expect(err).ToNot(HaveOccurred())
-			_, err = io.Copy(GinkgoWriter, resp.Body)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+				b.Navigate("http://grafana.grafana-mongodb-it.cluster/datasources")
+				Eventually(datasource.uiSelector, "15s").Should(b.Exist())
+				b.Click(datasource.uiSelector)
+				Eventually(preprovisionedAlert, "15s").Should(b.Exist())
+			})
 		})
+
+		for _, query := range queries {
+			query := query
+			It(fmt.Sprintf("should execute the %s query against the %s datasource", query.Name, datasource.name), func() {
+				datasource := datasource
+
+				for ix := range query.Body.Queries {
+					query.Body.Queries[ix].DatasourceID = datasource.id
+					query.Body.Queries[ix].Datasource.UID = datasource.uid
+				}
+				queryBytes, err := io.ReadAll(query.Reader())
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Printf("Executing query %s\n", string(queryBytes))
+
+				req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ds/query", query.Reader())
+				Expect(err).ToNot(HaveOccurred())
+				req.SetBasicAuth("admin", "adminPassword")
+				req.Header.Set("accept", "application/json, text/plain, */*")
+				req.Header.Set("content-type", "application/json")
+				resp, err := clusterHTTPClient.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Print("Got response ")
+				_, err = io.Copy(GinkgoWriter, resp.Body)
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("")
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+		}
 	}
 
 })

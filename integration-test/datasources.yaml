@@ -8,6 +8,14 @@ datasources:
   secureJsonData:
     username: root
     password: rootPassword
+- name: mongodb-non-default-auth-source
+  type: meln5674-mongodb-community
+  access: proxy
+  jsonData:
+    url: mongodb://mongodb:27017/?authSource=non_default_auth_source
+  secureJsonData:
+    username: test-user
+    password: test-password
 - name: mongodb-no-auth
   type: meln5674-mongodb-community
   access: proxy
@@ -17,7 +25,7 @@ datasources:
   type: meln5674-mongodb-community
   access: proxy
   jsonData:
-    url: mongodb://mongodb-mtls-0.mongodb-mtls:27017
+    url: mongodb://mongodb-mtls:27017
     tls: true
     tlsCertificate: TLS_CERTIFICATE
     tlsCa: TLS_CA
@@ -30,7 +38,7 @@ datasources:
   type: meln5674-mongodb-community
   access: proxy
   jsonData:
-    url: mongodb://mongodb-tls-0.mongodb-tls.default.svc.cluster.local:27017
+    url: mongodb://mongodb-tls:27017
     tls: true
     tlsCa: TLS_CA
   secureJsonData:
@@ -40,7 +48,7 @@ datasources:
   type: meln5674-mongodb-community
   access: proxy
   jsonData:
-    url: mongodb://mongodb-tls-0.mongodb-tls.default.svc.cluster.local:27017
+    url: mongodb://mongodb-tls:27017
     tls: true
     tlsInsecure: true
   secureJsonData:

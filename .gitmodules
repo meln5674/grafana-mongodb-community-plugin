@@ -1,0 +1,4 @@
+[submodule "integration-test/bitnami-charts"]
+	path = integration-test/bitnami-charts
+	url = git@github.com:meln5674/bitnami-charts.git
+	branch = feature/mongodb-tls-only-13317

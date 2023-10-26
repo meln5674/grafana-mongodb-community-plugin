@@ -19,6 +19,8 @@ jobs:
     steps:
 
       - uses: actions/checkout@v3
+        with:
+          submodules: true
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
@@ -71,12 +73,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go
 
+      - name: Lint
+        id: lint
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn lint
+
 
       - name: Build Frontend
         id: build-frontend
         run: |
           export GOPATH=~/go
           ./build-env.sh yarn build
+
+      - name: Run Unit Tests
+        id: unit-tests
+        run: |
+          export GOPATH=~/go
+          ./build-env.sh yarn test-backend
 
       - name: Build Backend
         id: build-backend
@@ -93,6 +107,7 @@ jobs:
       - name: Run Integration Tests
         id: run-integration-tests
         run: |
+          helm dependency update integration-test/bitnami-charts/bitnami/mongodb
           export GOPATH=~/go
           ./build-env.sh yarn integration-test
 
@@ -101,8 +116,8 @@ jobs:
         if: contains(github.ref, 'tags/v')
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ github.ref }}"
+          # automatic_release_tag: "${{ github.ref }}"
           prerelease: true
-          title: "${{ github.ref }}"
+          title: "${{ github.tag }}"
           files: |
             meln5674-mongodb-community.zip
