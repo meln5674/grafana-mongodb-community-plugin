@@ -106,6 +106,50 @@ var _ = Describe("The plugin", func() {
 				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			})
 		}
+
+		createFolder := "weather/alerts/create-folder"
+		createRuleGroup := "weather/alerts/create-rule-group"
+		It(fmt.Sprintf("should execute the %s query", createFolder), func() {
+			f, err := os.Open(filepath.Join("../integration-test/queries", createFolder+".json"))
+			Expect(err).ToNot(HaveOccurred())
+	
+			req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/folders", f)
+			Expect(err).ToNot(HaveOccurred())
+			req.SetBasicAuth("admin", "adminPassword")
+			req.Header.Set("accept", "application/json, text/plain, */*")
+			req.Header.Set("content-type", "application/json")
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(GinkgoWriter, resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+		It(fmt.Sprintf("should execute the %s query", createRuleGroup), func() {
+			f, err := os.Open(filepath.Join("../integration-test/queries", createFolder+".json"))
+			Expect(err).ToNot(HaveOccurred())
+	
+			req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ruler/grafana/api/v1/rules/alert_folder?subtype=cortex", f)
+			Expect(err).ToNot(HaveOccurred())
+			req.SetBasicAuth("admin", "adminPassword")
+			req.Header.Set("accept", "application/json, text/plain, */*")
+			req.Header.Set("content-type", "application/json")
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(GinkgoWriter, resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
+		It(fmt.Sprintf("should execute the alerts evaluation query", createRuleGroup), func() {
+			req, err := http.NewRequest(http.MethodGet, "http://grafana.grafana-mongodb-it.cluster/api/prometheus/grafana/api/v1/rules", nil)
+			Expect(err).ToNot(HaveOccurred())
+			req.SetBasicAuth("admin", "adminPassword")
+			req.Header.Set("accept", "application/json, text/plain, */*")
+			resp, err := client.Do(req)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = io.Copy(GinkgoWriter, resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		})
 	}
 
 })
