@@ -128,7 +128,7 @@ var _ = Describe("The plugin", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	})
 	It(fmt.Sprintf("should execute the %s query", createRuleGroup), func() {
-		f, err := os.Open(filepath.Join("../integration-test/queries", createFolder+".json"))
+		f, err := os.Open(filepath.Join("../integration-test/queries", createRuleGroup+".json"))
 		Expect(err).ToNot(HaveOccurred())
 
 		req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ruler/grafana/api/v1/rules/alerts?subtype=cortex", f)
