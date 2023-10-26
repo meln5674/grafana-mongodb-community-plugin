@@ -131,7 +131,7 @@ var _ = Describe("The plugin", func() {
 		f, err := os.Open(filepath.Join("../integration-test/queries", createFolder+".json"))
 		Expect(err).ToNot(HaveOccurred())
 
-		req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ruler/grafana/api/v1/rules/alert_folder?subtype=cortex", f)
+		req, err := http.NewRequest(http.MethodPost, "http://grafana.grafana-mongodb-it.cluster/api/ruler/grafana/api/v1/rules/alerts?subtype=cortex", f)
 		Expect(err).ToNot(HaveOccurred())
 		req.SetBasicAuth("admin", "adminPassword")
 		req.Header.Set("accept", "application/json, text/plain, */*")
