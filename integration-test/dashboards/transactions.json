@@ -24,7 +24,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -52,6 +51,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -73,7 +73,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -105,7 +106,7 @@
       },
       "targets": [
         {
-          "aggregation": "[\n  { \"$unwind\": \"$transactions\" },\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\",\n    \"total\": { \"$toDouble\": \"$transactions.total\"  }\n  } },\n  { \"$match\": {\n      \"code\": { \"$in\": $code },\n      \"symbol\": { \"$in\": $symbol }\n  } }\n]",
+          "aggregation": "[\n  { \"$unwind\": \"$transactions\" },\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\",\n    \"total\": { \"$toDouble\": \"$transactions.total\"  }\n  } },\n  { \"$match\": {\n      \"code\": { \"$in\": $code },\n      \"symbol\": { \"$in\": $symbol }\n  } },\n  { \"$match\": {\n    \"$expr\": { \n      \"$and\": [\n        { \"$lte\": [{\"$date\": \"${__from:date:iso}\"}, \"$date\"] },\n        { \"$lte\": [\"$date\", {\"$date\": \"${__to:date:iso}\"}] }\n      ]\n    }\n  } }\n]",
           "autoTimeBound": false,
           "autoTimeSort": true,
           "collection": "transactions",
@@ -118,8 +119,11 @@
             "code",
             "symbol"
           ],
+          "legendFormat": "",
           "queryType": "Timeseries",
           "refId": "A",
+          "schemaInference": false,
+          "schemaInferenceDepth": 20,
           "timestampField": "date",
           "timestampFormat": "",
           "valueFieldTypes": [
@@ -134,8 +138,8 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
-  "schemaVersion": 37,
+  "refresh": "",
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -144,7 +148,7 @@
         "current": {
           "selected": false,
           "text": "mongodb",
-          "value": "mongodb"
+          "value": "P1CC9A79BDAF09793"
         },
         "hide": 0,
         "includeAll": false,
@@ -237,6 +241,6 @@
   "timezone": "",
   "title": "Transactions",
   "uid": "SKyKSuOVz",
-  "version": 10,
+  "version": 1,
   "weekStart": ""
 }

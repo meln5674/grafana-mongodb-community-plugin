@@ -24,7 +24,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -52,6 +51,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -124,7 +124,7 @@
           "schemaInference": false,
           "schemaInferenceDepth": 20,
           "timestampField": "created_at",
-          "timestampFormat": "Mon Jan 02 15:04:05 -0700 2006",
+          "timestampFormat": "Jan 02 15:04:05 -0700 2006",
           "valueFieldTypes": [
             "float64"
           ],
@@ -137,8 +137,8 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
-  "schemaVersion": 37,
+  "refresh": "",
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -147,7 +147,7 @@
         "current": {
           "selected": false,
           "text": "mongodb",
-          "value": "mongodb"
+          "value": "P1CC9A79BDAF09793"
         },
         "hide": 0,
         "includeAll": false,
@@ -165,14 +165,14 @@
         "current": {
           "selected": true,
           "text": [
+            "http://t.co/Lg7nFDkidP",
             "http://t.co/vVcENSGcDg",
-            "http://t.co/3Xvuxw2JEG",
-            "http://t.co/Lg7nFDkidP"
+            "http://t.co/3Xvuxw2JEG"
           ],
           "value": [
+            "http://t.co/Lg7nFDkidP",
             "http://t.co/vVcENSGcDg",
-            "http://t.co/3Xvuxw2JEG",
-            "http://t.co/Lg7nFDkidP"
+            "http://t.co/3Xvuxw2JEG"
           ]
         },
         "datasource": {
