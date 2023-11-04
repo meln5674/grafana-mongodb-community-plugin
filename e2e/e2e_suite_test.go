@@ -390,6 +390,13 @@ var (
 					},
 				},
 			),
+			gingk8s.ConfigMap("dashboard-weather", "", nil,
+				gingk8s.Object{
+					"weather.json": func() ([]byte, error) {
+						return os.ReadFile("../integration-test/dashboards/weather.json")
+					},
+				},
+			),
 			gingk8s.ConfigMap("grafana-ini", "", nil,
 				gingk8s.Object{
 					"grafana.ini": func() ([]byte, error) {
@@ -410,6 +417,8 @@ var (
 		"dashboardsConfigMaps[0].fileName":      "retweets.json",
 		"dashboardsConfigMaps[1].configMapName": "dashboard-transactions",
 		"dashboardsConfigMaps[1].fileName":      "transactions.json",
+		"dashboardsConfigMaps[2].configMapName": "dashboard-weather",
+		"dashboardsConfigMaps[2].fileName":      "weather.json",
 		"podLabels.plugin-sum": func() string {
 			pluginBytes, err := os.ReadFile("../meln5674-mongodb-community.zip")
 			Expect(err).ToNot(HaveOccurred())
