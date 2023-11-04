@@ -307,17 +307,17 @@ var (
 	}
 
 	mongodbChart = gingk8s.HelmChart{
-		/*
-			RemoteChartInfo: gingk8s.RemoteChartInfo{
-				Name:    "mongodb",
-				Repo:    &bitnamiRepo,
-				Version: "13.18.1",
-			}
-		*/
-		LocalChartInfo: gingk8s.LocalChartInfo{
-			Path: "../integration-test/bitnami-charts/bitnami/mongodb/",
-			// DependencyUpdate: true,
+		RemoteChartInfo: gingk8s.RemoteChartInfo{
+			Name:    "mongodb",
+			Repo:    &bitnamiRepo,
+			Version: "14.1.0",
 		},
+		/*
+			LocalChartInfo: gingk8s.LocalChartInfo{
+				Path: "../integration-test/bitnami-charts/bitnami/mongodb/",
+				// DependencyUpdate: true,
+			},
+		*/
 	}
 
 	mongodb = gingk8s.HelmRelease{
@@ -443,16 +443,24 @@ var (
 		"plugins": "meln5674-mongodb-community=http://plugin-repo/grafana-mongodb-community-plugin/meln5674-mongodb-community.zip",
 	}
 
-	grafana = gingk8s.HelmRelease{
-		Name: "grafana",
-		Chart: &gingk8s.HelmChart{
+	grafanaChart = gingk8s.HelmChart{
+		/*
 			RemoteChartInfo: gingk8s.RemoteChartInfo{
 				Name: "grafana",
 				Repo: &bitnamiRepo,
 				// TODO: Pin Version
 			},
+		*/
+		LocalChartInfo: gingk8s.LocalChartInfo{
+			Path:             "../integration-test/bitnami-charts/bitnami/grafana/",
+			DependencyUpdate: true,
 		},
-		Set: grafanaSet(devMode),
+	}
+
+	grafana = gingk8s.HelmRelease{
+		Name:  "grafana",
+		Chart: &grafanaChart,
+		Set:   grafanaSet(devMode),
 	}
 
 	grafana7 = gingk8s.HelmRelease{
