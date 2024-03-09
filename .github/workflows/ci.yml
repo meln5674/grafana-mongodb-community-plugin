@@ -107,7 +107,6 @@ jobs:
       - name: Run Integration Tests
         id: run-integration-tests
         run: |
-          helm dependency update integration-test/bitnami-charts/bitnami/mongodb
           export GOPATH=~/go
           ./build-env.sh yarn integration-test
 
