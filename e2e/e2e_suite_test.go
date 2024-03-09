@@ -312,12 +312,6 @@ var (
 			Repo:    &bitnamiRepo,
 			Version: "14.1.0",
 		},
-		/*
-			LocalChartInfo: gingk8s.LocalChartInfo{
-				Path: "../integration-test/bitnami-charts/bitnami/mongodb/",
-				// DependencyUpdate: true,
-			},
-		*/
 	}
 
 	mongodb = gingk8s.HelmRelease{
@@ -444,16 +438,10 @@ var (
 	}
 
 	grafanaChart = gingk8s.HelmChart{
-		/*
-			RemoteChartInfo: gingk8s.RemoteChartInfo{
-				Name: "grafana",
-				Repo: &bitnamiRepo,
-				// TODO: Pin Version
-			},
-		*/
-		LocalChartInfo: gingk8s.LocalChartInfo{
-			Path:             "../integration-test/bitnami-charts/bitnami/grafana/",
-			DependencyUpdate: true,
+		RemoteChartInfo: gingk8s.RemoteChartInfo{
+			Name:    "grafana",
+			Repo:    &bitnamiRepo,
+			Version: "9.6.0",
 		},
 	}
 
