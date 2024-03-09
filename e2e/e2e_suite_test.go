@@ -47,14 +47,14 @@ var (
 
 var _ = BeforeSuite(func(ctx context.Context) {
 	f, err := os.Create("../integration-test/datasets/download/tweets.zip")
-	resp, err := http.Get("https://github.com/ozlerhakan/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true")
+	resp, err := http.Get("https://github.com/meln5674/mongodb-json-files/blob/master/datasets/tweets.zip?raw=true")
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	_, err = io.Copy(f, resp.Body)
 	Expect(err).ToNot(HaveOccurred())
 
 	f, err = os.Create("../integration-test/datasets/download/transactions.json")
-	resp, err = http.Get("https://github.com/fieldsets/mongodb-sample-datasets/blob/main/sample_analytics/transactions.json?raw=true")
+	resp, err = http.Get("https://github.com/meln5674/mongodb-sample-dataset/blob/main/sample_analytics/transactions.json?raw=true")
 	Expect(err).ToNot(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	_, err = io.Copy(f, resp.Body)
