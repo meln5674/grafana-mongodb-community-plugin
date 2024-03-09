@@ -38,6 +38,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -109,7 +110,7 @@
           "aggregation": "[\n  { \"$unwind\": \"$transactions\" },\n  { \"$project\": {\n    \"date\": \"$transactions.date\",\n    \"symbol\": \"$transactions.symbol\",\n    \"code\": \"$transactions.transaction_code\",\n    \"total\": { \"$toDouble\": \"$transactions.total\"  }\n  } },\n  { \"$match\": {\n      \"code\": { \"$in\": $code },\n      \"symbol\": { \"$in\": $symbol }\n  } },\n  { \"$match\": {\n    \"$expr\": { \n      \"$and\": [\n        { \"$lte\": [{\"$date\": \"${__from:date:iso}\"}, \"$date\"] },\n        { \"$lte\": [\"$date\", {\"$date\": \"${__to:date:iso}\"}] }\n      ]\n    }\n  } }\n]",
           "autoTimeBound": false,
           "autoTimeSort": true,
-          "collection": "transactions",
+          "collection": "${collection}",
           "database": "analytics",
           "datasource": {
             "type": "meln5674-mongodb-community",
@@ -140,7 +141,6 @@
   ],
   "refresh": "",
   "schemaVersion": 38,
-  "style": "dark",
   "tags": [],
   "templating": {
     "list": [
@@ -163,16 +163,16 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "amd",
             "ibm",
-            "msft"
+            "msft",
+            "amd"
           ],
           "value": [
-            "amd",
             "ibm",
-            "msft"
+            "msft",
+            "amd"
           ]
         },
         "datasource": {
@@ -200,7 +200,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "buy"
           ],
@@ -230,6 +230,25 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "transactions",
+          "value": "transactions"
+        },
+        "hide": 0,
+        "name": "collection",
+        "options": [
+          {
+            "selected": true,
+            "text": "transactions",
+            "value": "transactions"
+          }
+        ],
+        "query": "transactions",
+        "skipUrlSync": false,
+        "type": "textbox"
       }
     ]
   },

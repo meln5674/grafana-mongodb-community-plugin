@@ -22,6 +22,8 @@ export class DataSource extends DataSourceWithBackend<MongoDBQuery, MongoDBDataS
     const templateSrv = getTemplateSrv();
     return {
       ...query,
+      database: query.database ? templateSrv.replace(query.database, scopedVars) : '',
+      collection: query.collection ? templateSrv.replace(query.collection, scopedVars) : '',
       aggregation: query.aggregation ? templateSrv.replace(query.aggregation, scopedVars, 'json') : ''
     };
   }
