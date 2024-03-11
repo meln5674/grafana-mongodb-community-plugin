@@ -6,6 +6,7 @@
   "metrics": true,
   "backend": true,
   "executable": "gpx_mongodb-community",
+  "alerting": true,
   "info": {
     "description": "Community-supported MongoDB Datasource Plugin",
     "author": {
